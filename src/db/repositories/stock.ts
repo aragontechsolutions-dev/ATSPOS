@@ -55,6 +55,80 @@ export async function ajustarStock(input: NuevoMovimiento): Promise<void> {
   });
 }
 
+/**
+ * Sets the physical count of a product: inserts an `ajuste` movement for the
+ * delta between the counted amount and the current stock, keeping the ledger
+ * as the single source of truth.
+ */
+export async function corregirStockPorConteo(input: {
+  productoId: string;
+  cantidadContada: number;
+  motivo?: string;
+  usuarioId: string;
+}): Promise<void> {
+  db.transaction((tx) => {
+    const producto = tx.select().from(productos).where(eq(productos.id, input.productoId)).get();
+    if (!producto) throw new Error('Producto no encontrado');
+    const delta = input.cantidadContada - producto.stockActual;
+    if (delta === 0) return;
+    insertarMovimientoSync(tx, {
+      productoId: input.productoId,
+      tipo: 'ajuste',
+      cantidad: delta,
+      motivo: input.motivo ?? 'corrección de conteo',
+      usuarioId: input.usuarioId,
+    });
+    recomputeStockActualSync(tx, input.productoId);
+  });
+}
+
+/**
+ * Moves units between the back-room (`stock_deposito`) and the sales floor
+ * (`stock_actual`). Floor stock stays ledger-backed via a `traspaso` movement;
+ * `stock_deposito` is adjusted directly.
+ */
+export async function traspasarDepositoATienda(input: {
+  productoId: string;
+  cantidad: number;
+  hacia: 'tienda' | 'deposito';
+  usuarioId: string;
+}): Promise<void> {
+  if (input.cantidad <= 0) throw new Error('La cantidad debe ser mayor a cero');
+  db.transaction((tx) => {
+    const producto = tx.select().from(productos).where(eq(productos.id, input.productoId)).get();
+    if (!producto) throw new Error('Producto no encontrado');
+
+    if (input.hacia === 'tienda') {
+      if (producto.stockDeposito < input.cantidad) throw new Error('Stock de depósito insuficiente');
+      tx.update(productos)
+        .set({ stockDeposito: producto.stockDeposito - input.cantidad, updatedAt: new Date() })
+        .where(eq(productos.id, input.productoId))
+        .run();
+      insertarMovimientoSync(tx, {
+        productoId: input.productoId,
+        tipo: 'traspaso',
+        cantidad: input.cantidad,
+        motivo: 'traspaso depósito → tienda',
+        usuarioId: input.usuarioId,
+      });
+    } else {
+      if (producto.stockActual < input.cantidad) throw new Error('Stock de tienda insuficiente');
+      tx.update(productos)
+        .set({ stockDeposito: producto.stockDeposito + input.cantidad, updatedAt: new Date() })
+        .where(eq(productos.id, input.productoId))
+        .run();
+      insertarMovimientoSync(tx, {
+        productoId: input.productoId,
+        tipo: 'traspaso',
+        cantidad: -input.cantidad,
+        motivo: 'traspaso tienda → depósito',
+        usuarioId: input.usuarioId,
+      });
+    }
+    recomputeStockActualSync(tx, input.productoId);
+  });
+}
+
 export async function historialMovimientos(productoId: string) {
   return db.query.movimientosStock.findMany({
     where: eq(movimientosStock.productoId, productoId),
