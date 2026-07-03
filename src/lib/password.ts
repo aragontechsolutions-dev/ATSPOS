@@ -7,9 +7,26 @@ import * as Crypto from 'expo-crypto';
 // we avoid one more native dependency to maintain.
 //
 // bcryptjs v3 removed its insecure Math.random fallback and requires a secure
-// PRNG. React Native/Hermes has no global `crypto.getRandomValues`, so without
-// this the salt generation fails (surfacing as "Invalid string / salt: Not a
-// string"). We wire it to expo-crypto's synchronous secure random bytes.
+// PRNG. React Native/Hermes has no global `crypto.getRandomValues`, so out of
+// the box salt generation fails (surfacing as "Invalid string / salt: Not a
+// string"). We provide randomness two ways for robustness:
+//   1. Polyfill the global `crypto.getRandomValues` with expo-crypto — this is
+//      bcryptjs's preferred source.
+//   2. Register `setRandomFallback` as a backup path.
+// Both draw from expo-crypto's cryptographically secure generator.
+
+function installSecureRandom() {
+  const g = globalThis as unknown as { crypto?: { getRandomValues?: unknown } };
+  if (!g.crypto) {
+    g.crypto = {};
+  }
+  if (typeof g.crypto.getRandomValues !== 'function') {
+    g.crypto.getRandomValues = (array: Parameters<typeof Crypto.getRandomValues>[0]) =>
+      Crypto.getRandomValues(array);
+  }
+}
+
+installSecureRandom();
 bcrypt.setRandomFallback((len) => Array.from(Crypto.getRandomBytes(len)));
 
 const SALT_ROUNDS = 10;
