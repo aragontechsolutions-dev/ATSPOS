@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { Button, Divider, Modal, Portal, RadioButton, Text, TextInput } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   abrirTurno,
@@ -154,27 +155,37 @@ function AbrirTurnoForm({ usuarioId, onAbierto }: { usuarioId: string; onAbierto
   }
 
   return (
-    <View style={styles.center}>
-      <Text variant="titleMedium" style={styles.centerTitle}>
-        Abrir turno de caja
-      </Text>
-      <TextInput
-        label="Fondo inicial (efectivo en caja)"
-        value={baseInicial}
-        onChangeText={setBaseInicial}
-        mode="outlined"
-        keyboardType="decimal-pad"
-        style={styles.input}
-      />
-      {error && (
-        <Text style={styles.error} variant="bodyMedium">
-          {error}
+    <SafeAreaView edges={['bottom']} style={styles.abrirContainer}>
+      <View style={styles.abrirInner}>
+        <Text variant="titleLarge" style={styles.centerTitle}>
+          Abrir turno de caja
         </Text>
-      )}
-      <Button icon="lock-open-variant" mode="contained" onPress={onSubmit} loading={loading} disabled={loading}>
-        Abrir turno
-      </Button>
-    </View>
+        <TextInput
+          label="Fondo inicial (efectivo en caja)"
+          value={baseInicial}
+          onChangeText={setBaseInicial}
+          mode="outlined"
+          keyboardType="decimal-pad"
+          dense
+          style={styles.abrirInput}
+        />
+        {error && (
+          <Text style={styles.error} variant="bodyMedium">
+            {error}
+          </Text>
+        )}
+        <Button
+          icon="lock-open-variant"
+          mode="contained"
+          onPress={onSubmit}
+          loading={loading}
+          disabled={loading}
+          style={styles.abrirBoton}
+        >
+          Abrir turno
+        </Button>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -306,6 +317,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   centerTitle: { textAlign: 'center', marginBottom: 12 },
+  abrirContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 32 },
+  abrirInner: { width: '100%', maxWidth: 480, alignSelf: 'center' },
+  abrirInput: { marginBottom: 16 },
+  abrirBoton: { paddingVertical: 4 },
   resumen: { paddingVertical: 8, gap: 4 },
   actions: { flexDirection: 'row', gap: 8, paddingVertical: 12 },
   actionButton: { flex: 1 },
