@@ -1,7 +1,18 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { Button, Divider, IconButton, Modal, Portal, RadioButton, Text, TextInput } from 'react-native-paper';
+import {
+  Button,
+  Divider,
+  IconButton,
+  List,
+  Modal,
+  Portal,
+  RadioButton,
+  Snackbar,
+  Text,
+  TextInput,
+} from 'react-native-paper';
 
 import { BarcodeScannerModal } from '@/components/barcode-scanner';
 import { turnoAbiertoDe, type Turno } from '@/db/repositories/caja';
@@ -19,31 +30,44 @@ export default function VentaScreen() {
   const [resultados, setResultados] = useState<Producto[]>([]);
   const [scannerVisible, setScannerVisible] = useState(false);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const { items, descuento, incrementar, decrementar, addProducto, subtotal, total } = useCartStore();
 
-  const cargarTurno = useCallback(() => {
-    if (usuario) turnoAbiertoDe(usuario.id).then(setTurno);
-  }, [usuario]);
+  const cargar = useCallback(() => {
+    if (!usuario) return;
+    turnoAbiertoDe(usuario.id).then(setTurno);
+    listarProductos(busqueda).then(setResultados);
+  }, [usuario, busqueda]);
 
-  useFocusEffect(cargarTurno);
+  useFocusEffect(cargar);
 
   async function buscar(texto: string) {
     setBusqueda(texto);
-    if (!texto.trim()) {
-      setResultados([]);
+    setResultados(await listarProductos(texto));
+  }
+
+  function agregarAlCarrito(producto: Producto) {
+    if (producto.stockActual <= 0) {
+      setAviso(`"${producto.nombre}" no tiene stock disponible`);
       return;
     }
-    setResultados(await listarProductos(texto));
+    const yaEnCarrito = items.find((i) => i.productoId === producto.id);
+    if (yaEnCarrito && yaEnCarrito.cantidad >= producto.stockActual) {
+      setAviso(`No hay más stock de "${producto.nombre}"`);
+      return;
+    }
+    addProducto(producto);
+    setAviso(`Agregado: ${producto.nombre}`);
   }
 
   async function onScanned(codigo: string) {
     setScannerVisible(false);
     const producto = await buscarPorCodigoBarras(codigo);
     if (producto) {
-      addProducto(producto);
-      setBusqueda('');
-      setResultados([]);
+      agregarAlCarrito(producto);
+    } else {
+      setAviso('No se encontró un producto con ese código');
     }
   }
 
@@ -70,32 +94,53 @@ export default function VentaScreen() {
           value={busqueda}
           onChangeText={buscar}
           mode="outlined"
+          dense
           style={styles.search}
         />
         <IconButton icon="barcode-scan" mode="contained" onPress={() => setScannerVisible(true)} />
       </View>
 
-      {resultados.length > 0 && (
-        <FlatList
-          data={resultados}
-          keyExtractor={(p) => p.id}
-          style={styles.resultsList}
-          renderItem={({ item }) => (
-            <Button
-              onPress={() => {
-                addProducto(item);
-                setBusqueda('');
-                setResultados([]);
-              }}
-              style={styles.resultButton}
-              contentStyle={styles.resultButtonContent}
-            >
-              {`${item.nombre} · ${formatMoney(item.precioVenta)} (stock: ${item.stockActual})`}
-            </Button>
-          )}
-        />
-      )}
+      <Text variant="labelLarge" style={styles.sectionLabel}>
+        Tocá un producto para agregarlo
+      </Text>
+      <FlatList
+        data={resultados}
+        keyExtractor={(p) => p.id}
+        ItemSeparatorComponent={Divider}
+        style={styles.pickerList}
+        keyboardShouldPersistTaps="handled"
+        renderItem={({ item }) => {
+          const sinStock = item.stockActual <= 0;
+          return (
+            <List.Item
+              title={item.nombre}
+              titleStyle={sinStock ? styles.sinStockText : undefined}
+              description={`${formatMoney(item.precioVenta)} · Stock: ${item.stockActual}`}
+              onPress={() => agregarAlCarrito(item)}
+              left={(props) => (
+                <List.Icon {...props} icon={sinStock ? 'package-variant-closed' : 'package-variant'} />
+              )}
+              right={(props) => (
+                <List.Icon
+                  {...props}
+                  icon={sinStock ? 'cancel' : 'plus-circle'}
+                  color={sinStock ? '#B3261E' : '#0B6E4F'}
+                />
+              )}
+            />
+          );
+        }}
+        ListEmptyComponent={
+          <Text style={styles.empty} variant="bodyMedium">
+            No hay productos. Cargá productos desde la pestaña Productos.
+          </Text>
+        }
+      />
 
+      <Divider />
+      <Text variant="labelLarge" style={styles.sectionLabel}>
+        Carrito ({items.length})
+      </Text>
       <FlatList
         data={items}
         keyExtractor={(i) => i.productoId}
@@ -121,7 +166,7 @@ export default function VentaScreen() {
         )}
         ListEmptyComponent={
           <Text style={styles.empty} variant="bodyMedium">
-            Buscá o escaneá un producto para agregarlo a la venta.
+            El carrito está vacío. Tocá un producto de arriba para agregarlo.
           </Text>
         }
       />
@@ -159,6 +204,10 @@ export default function VentaScreen() {
           />
         </Modal>
       </Portal>
+
+      <Snackbar visible={!!aviso} onDismiss={() => setAviso(null)} duration={1800}>
+        {aviso ?? ''}
+      </Snackbar>
     </View>
   );
 }
@@ -286,10 +335,10 @@ const styles = StyleSheet.create({
   emptyText: { textAlign: 'center' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   search: { flex: 1 },
-  resultsList: { maxHeight: 160, marginTop: 4 },
-  resultButton: { justifyContent: 'flex-start' },
-  resultButtonContent: { justifyContent: 'flex-start' },
-  cartList: { flex: 1, marginTop: 8 },
+  sectionLabel: { marginTop: 6, marginBottom: 2, opacity: 0.8 },
+  pickerList: { flexGrow: 0, maxHeight: '38%' },
+  sinStockText: { opacity: 0.5 },
+  cartList: { flex: 1, marginTop: 4 },
   cartRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
   cartInfo: { flex: 1 },
   cartSub: { opacity: 0.7 },
