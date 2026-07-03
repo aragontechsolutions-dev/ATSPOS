@@ -151,6 +151,18 @@ export const movimientosStock = sqliteTable('movimientos_stock', {
   ...syncColumns,
 });
 
+// Append-only audit trail of sensitive actions (cash movements, stock
+// adjustments, purchases, user management, backups). Never edited or deleted.
+export const auditoria = sqliteTable('auditoria', {
+  id: text('id').primaryKey(),
+  fecha: integer('fecha', { mode: 'timestamp_ms' }).notNull(),
+  usuarioId: text('usuario_id'),
+  usuarioNombre: text('usuario_nombre'),
+  accion: text('accion').notNull(),
+  detalle: text('detalle'),
+  ...syncColumns,
+});
+
 export const movimientosCaja = sqliteTable('movimientos_caja', {
   id: text('id').primaryKey(),
   turnoId: text('turno_id')

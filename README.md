@@ -17,8 +17,27 @@ expo-sqlite + Drizzle ORM, y React Native Paper.
 - Gestión de caja: apertura de turno con fondo inicial, ingresos/egresos, cierre con arqueo
   (efectivo esperado vs. contado).
 
-Pendiente para etapas siguientes: compras a proveedores, dashboard de KPIs, exportación a
-Excel, SQLCipher, y sincronización multi-dispositivo.
+### Etapa 2 — Inventario avanzado y reportes
+
+- Proveedores, compras (con costo promedio ponderado), ajustes de stock y traspaso
+  depósito↔tienda.
+- Dashboard de KPIs (ventas, ticket promedio, margen, rotación, valor de inventario) y
+  exportación a Excel de ventas e inventario.
+
+### Etapa 3 — Seguridad reforzada
+
+- **Base de datos cifrada con SQLCipher (AES-256).** La clave se genera al primer arranque y
+  se guarda en `expo-secure-store` (Android Keystore); nunca está en el código.
+- **Log de auditoría** de acciones sensibles (caja, ajustes de stock, compras, alta de
+  usuarios, cambios de contraseña, backups).
+- **Backups exportables cifrados con contraseña** (AES-GCM). Se exportan/restauran desde
+  Ajustes → Seguridad (solo admin). Sin la contraseña no se pueden restaurar.
+
+> **Importante al activar SQLCipher:** la base pasa a estar cifrada. Si ya tenías la app
+> instalada con datos sin cifrar, **desinstalá y reinstalá** (o borrá los datos de la app)
+> para que se cree una base nueva cifrada; una base plana previa no se puede abrir con clave.
+
+Pendiente para etapas siguientes: sincronización multi-dispositivo.
 
 ## Usuario por defecto
 

@@ -14,6 +14,7 @@ import {
   type Turno,
 } from '@/db/repositories/caja';
 import { ventasDelTurno } from '@/db/repositories/ventas';
+import { auditar } from '@/lib/audit';
 import { formatMoney, parseMoneyInput } from '@/lib/money';
 import { useSessionStore } from '@/store/session';
 
@@ -145,7 +146,9 @@ function AbrirTurnoForm({ usuarioId, onAbierto }: { usuarioId: string; onAbierto
     setError(null);
     setLoading(true);
     try {
-      await abrirTurno(usuarioId, parseMoneyInput(baseInicial || '0'));
+      const base = parseMoneyInput(baseInicial || '0');
+      await abrirTurno(usuarioId, base);
+      auditar('Apertura de caja', `Base inicial: ${formatMoney(base)}`);
       onAbierto();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo abrir el turno');
@@ -211,6 +214,10 @@ function MovimientoCajaForm({
     }
     setError(null);
     await registrarMovimientoCaja({ turnoId, tipo, monto: centavos, motivo: motivo.trim() || undefined });
+    auditar(
+      tipo === 'ingreso' ? 'Ingreso de caja' : 'Egreso de caja',
+      `${formatMoney(centavos)}${motivo.trim() ? ` · ${motivo.trim()}` : ''}`,
+    );
     onDone();
   }
 
@@ -262,6 +269,12 @@ function CierreTurnoForm({ turnoId, onDone, onCancel }: { turnoId: string; onDon
 
   async function onSubmit() {
     const turno = await cerrarTurno(turnoId, parseMoneyInput(contado || '0'));
+    auditar(
+      'Cierre de caja',
+      `Esperado: ${formatMoney(turno.efectivoEsperado ?? 0)} · Contado: ${formatMoney(
+        turno.efectivoContado ?? 0,
+      )} · Diferencia: ${formatMoney(turno.diferencia ?? 0)}`,
+    );
     setResultado({ diferencia: turno.diferencia ?? 0 });
   }
 

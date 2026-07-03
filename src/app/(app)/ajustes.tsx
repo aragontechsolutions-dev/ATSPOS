@@ -1,15 +1,17 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { Button, Divider, List, Text, TextInput } from 'react-native-paper';
 
 import { crearUsuario, listarUsuarios, type UsuarioConRol } from '@/db/repositories/usuarios';
+import { auditar } from '@/lib/audit';
 import { ROLES, tienePermiso } from '@/lib/roles';
 import { useSessionStore } from '@/store/session';
 
 export default function AjustesScreen() {
   const usuario = useSessionStore((s) => s.usuario);
   const logout = useSessionStore((s) => s.logout);
+  const router = useRouter();
   const esAdmin = usuario ? tienePermiso(usuario.rol, 'gestionarUsuarios') : false;
 
   const [usuarios, setUsuarios] = useState<UsuarioConRol[]>([]);
@@ -33,6 +35,7 @@ export default function AjustesScreen() {
     setError(null);
     try {
       await crearUsuario({ nombre, username, password, rolNombre: rol });
+      auditar('Alta de usuario', `${username} (${rol})`);
       setNombre('');
       setUsername('');
       setPassword('');
@@ -54,6 +57,17 @@ export default function AjustesScreen() {
 
       {esAdmin && (
         <>
+          <Divider />
+          <List.Section>
+            <List.Subheader>Seguridad</List.Subheader>
+            <List.Item
+              title="Backups y auditoría"
+              description="Exportar/restaurar backup cifrado, ver auditoría"
+              left={(props) => <List.Icon {...props} icon="shield-lock" />}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/seguridad')}
+            />
+          </List.Section>
           <Divider />
           <List.Section>
             <List.Subheader>Usuarios</List.Subheader>

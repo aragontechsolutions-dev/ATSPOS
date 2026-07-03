@@ -6,6 +6,7 @@ import { Button, Card, Divider, IconButton, SegmentedButtons, Text, TextInput } 
 import { ProductSearch } from '@/components/product-search';
 import { registrarCompra, type LineaCompra } from '@/db/repositories/compras';
 import { listarProveedores, type Proveedor } from '@/db/repositories/proveedores';
+import { auditar } from '@/lib/audit';
 import { formatMoney, parseMoneyInput } from '@/lib/money';
 import { useSessionStore } from '@/store/session';
 
@@ -43,11 +44,12 @@ export default function ComprasScreen() {
     setError(null);
     setGuardando(true);
     try {
-      await registrarCompra({
+      const resultado = await registrarCompra({
         proveedorId,
         usuarioId: usuario.id,
         lineas: lineas.map(({ costoInput, ...l }) => l),
       });
+      auditar('Compra registrada', `${lineas.length} ítem(s) · Total: ${formatMoney(resultado.total)}`);
       setLineas([]);
       setProveedorId(null);
       router.back();

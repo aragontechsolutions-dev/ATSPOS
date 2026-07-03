@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Button, Text, TextInput } from 'react-native-paper';
 
 import { cambiarPassword } from '@/db/repositories/usuarios';
+import { auditar } from '@/lib/audit';
 import { useSessionStore } from '@/store/session';
 
 export default function CambiarPasswordScreen() {
@@ -28,6 +29,7 @@ export default function CambiarPasswordScreen() {
     setLoading(true);
     try {
       await cambiarPassword(usuario.id, nueva);
+      auditar('Cambio de contraseña', usuario.username);
       await refresh();
     } finally {
       setLoading(false);

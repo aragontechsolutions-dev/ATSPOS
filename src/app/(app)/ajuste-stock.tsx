@@ -9,6 +9,7 @@ import { db } from '@/db/client';
 import { type Producto } from '@/db/repositories/productos';
 import { ajustarStock, traspasarDepositoATienda } from '@/db/repositories/stock';
 import { productos as productosTable } from '@/db/schema';
+import { auditar } from '@/lib/audit';
 import { useSessionStore } from '@/store/session';
 
 type Modo = 'ajuste' | 'traspaso';
@@ -37,15 +38,21 @@ export default function AjusteStockScreen() {
     }
     try {
       if (modo === 'ajuste') {
+        const signo = direccion === 'restar' ? -cant : cant;
         await ajustarStock({
           productoId: producto.id,
           tipo: 'ajuste',
-          cantidad: direccion === 'restar' ? -cant : cant,
+          cantidad: signo,
           motivo,
           usuarioId: usuario.id,
         });
+        auditar('Ajuste de stock', `${producto.nombre}: ${signo > 0 ? '+' : ''}${signo} (${motivo})`);
       } else {
         await traspasarDepositoATienda({ productoId: producto.id, cantidad: cant, hacia, usuarioId: usuario.id });
+        auditar(
+          'Traspaso de stock',
+          `${producto.nombre}: ${cant} u ${hacia === 'tienda' ? 'depósito → tienda' : 'tienda → depósito'}`,
+        );
       }
       setCantidad('');
       await recargarProducto(producto.id);

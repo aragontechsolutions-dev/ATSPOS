@@ -15,6 +15,13 @@
       "when": 1782948161921,
       "tag": "0001_wealthy_swordsman",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783042668690,
+      "tag": "0002_puzzling_krista_starr",
+      "breakpoints": true
     }
   ]
 }
