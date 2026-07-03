@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
-import { IconButton } from 'react-native-paper';
+import { IconButton, useTheme } from 'react-native-paper';
 
 import { tienePermiso } from '@/lib/roles';
 import { useSessionStore } from '@/store/session';
@@ -8,6 +8,7 @@ import { useSessionStore } from '@/store/session';
 export default function AppTabsLayout() {
   const usuario = useSessionStore((s) => s.usuario);
   const router = useRouter();
+  const theme = useTheme();
   const puedeGestionarProductos = usuario ? tienePermiso(usuario.rol, 'gestionarProductos') : false;
   const puedeAjustarStock = usuario ? tienePermiso(usuario.rol, 'ajustarStock') : false;
   const puedeVerReportes = usuario ? tienePermiso(usuario.rol, 'verReportes') : false;
@@ -16,8 +17,19 @@ export default function AppTabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: true,
+        headerStyle: { backgroundColor: theme.colors.primary },
+        headerTintColor: theme.colors.onPrimary,
+        headerTitleStyle: { fontWeight: '600' },
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
+        sceneStyle: { backgroundColor: theme.colors.background },
         headerRight: () => (
-          <IconButton icon="cog" onPress={() => router.push('/ajustes')} accessibilityLabel="Ajustes" />
+          <IconButton
+            icon="cog"
+            iconColor={theme.colors.onPrimary}
+            onPress={() => router.push('/ajustes')}
+            accessibilityLabel="Ajustes"
+          />
         ),
       }}
     >

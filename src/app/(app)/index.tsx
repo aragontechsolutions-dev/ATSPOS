@@ -55,7 +55,7 @@ export default function VentaScreen() {
         <Text variant="bodyLarge" style={styles.emptyText}>
           No tenés un turno de caja abierto.
         </Text>
-        <Button mode="contained" onPress={() => router.push('/caja')}>
+        <Button icon="cash-register" mode="contained" onPress={() => router.push('/caja')}>
           Ir a abrir caja
         </Button>
       </View>
@@ -131,7 +131,12 @@ export default function VentaScreen() {
           <Text variant="titleMedium">Total</Text>
           <Text variant="titleLarge">{formatMoney(total())}</Text>
         </View>
-        <Button mode="contained" disabled={items.length === 0} onPress={() => setCheckoutVisible(true)}>
+        <Button
+          icon="cash-multiple"
+          mode="contained"
+          disabled={items.length === 0}
+          onPress={() => setCheckoutVisible(true)}
+        >
           Cobrar
         </Button>
       </View>
@@ -220,7 +225,7 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, descuento, total, onClose 
             Vuelto: {formatMoney(confirmada.vuelto)}
           </Text>
         )}
-        <Button mode="contained" onPress={onClose}>
+        <Button icon="check" mode="contained" onPress={onClose}>
           Listo
         </Button>
       </View>
@@ -267,7 +272,7 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, descuento, total, onClose 
         <Button onPress={onClose} disabled={procesando}>
           Cancelar
         </Button>
-        <Button mode="contained" onPress={confirmar} loading={procesando} disabled={procesando}>
+        <Button icon="check" mode="contained" onPress={confirmar} loading={procesando} disabled={procesando}>
           Confirmar
         </Button>
       </View>

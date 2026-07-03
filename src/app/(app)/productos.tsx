@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { Button, Divider, FAB, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import { Button, Divider, FAB, List, Modal, Portal, Text, TextInput } from 'react-native-paper';
 
 import { BarcodeScannerModal } from '@/components/barcode-scanner';
 import { listarCategorias, type Categoria } from '@/db/repositories/categorias';
@@ -38,17 +38,22 @@ export default function ProductosScreen() {
         data={productos}
         keyExtractor={(p) => p.id}
         ItemSeparatorComponent={Divider}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <View style={styles.rowInfo}>
-              <Text variant="bodyLarge">{item.nombre}</Text>
-              <Text variant="bodySmall" style={styles.rowSub}>
-                {formatMoney(item.precioVenta)} · Stock: {item.stockActual}
-                {item.stockActual <= item.stockMinimo ? ' ⚠️ bajo stock' : ''}
-              </Text>
-            </View>
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const bajoStock = item.stockActual <= item.stockMinimo;
+          return (
+            <List.Item
+              title={item.nombre}
+              description={`${formatMoney(item.precioVenta)} · Stock: ${item.stockActual}${bajoStock ? ' · bajo stock' : ''}`}
+              left={(props) => (
+                <List.Icon
+                  {...props}
+                  icon={bajoStock ? 'alert-circle' : 'package-variant'}
+                  color={bajoStock ? '#B3261E' : undefined}
+                />
+              )}
+            />
+          );
+        }}
         ListEmptyComponent={
           <Text style={styles.empty} variant="bodyMedium">
             No hay productos cargados todavía.
@@ -200,8 +205,10 @@ function NuevoProductoForm({
         </Text>
       )}
       <View style={styles.formActions}>
-        <Button onPress={onCancel}>Cancelar</Button>
-        <Button mode="contained" onPress={onSubmit}>
+        <Button icon="close" onPress={onCancel}>
+          Cancelar
+        </Button>
+        <Button icon="content-save" mode="contained" onPress={onSubmit}>
           Guardar
         </Button>
       </View>

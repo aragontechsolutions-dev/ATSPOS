@@ -64,7 +64,7 @@ export default function LoginScreen() {
           </Text>
         )}
 
-        <Button mode="contained" onPress={onSubmit} loading={loading} disabled={loading} style={styles.button}>
+        <Button icon="login" mode="contained" onPress={onSubmit} loading={loading} disabled={loading} style={styles.button}>
           Ingresar
         </Button>
       </View>

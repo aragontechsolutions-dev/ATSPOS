@@ -139,7 +139,13 @@ export default function ComprasScreen() {
         <Text variant="titleMedium">Total compra</Text>
         <Text variant="titleLarge">{formatMoney(total)}</Text>
       </View>
-      <Button mode="contained" onPress={confirmar} loading={guardando} disabled={guardando || lineas.length === 0}>
+      <Button
+        icon="check-bold"
+        mode="contained"
+        onPress={confirmar}
+        loading={guardando}
+        disabled={guardando || lineas.length === 0}
+      >
         Confirmar compra
       </Button>
     </ScrollView>

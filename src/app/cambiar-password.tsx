@@ -67,10 +67,10 @@ export default function CambiarPasswordScreen() {
         </Text>
       )}
 
-      <Button mode="contained" onPress={onSubmit} loading={loading} disabled={loading} style={styles.button}>
+      <Button icon="content-save" mode="contained" onPress={onSubmit} loading={loading} disabled={loading} style={styles.button}>
         Guardar
       </Button>
-      <Button onPress={() => logout()} style={styles.button}>
+      <Button icon="logout" onPress={() => logout()} style={styles.button}>
         Cancelar y cerrar sesión
       </Button>
     </View>

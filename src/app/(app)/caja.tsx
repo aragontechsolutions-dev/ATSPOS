@@ -59,10 +59,20 @@ export default function CajaScreen() {
       <Divider />
 
       <View style={styles.actions}>
-        <Button mode="outlined" onPress={() => setMovimientoModalVisible(true)} style={styles.actionButton}>
+        <Button
+          icon="swap-vertical"
+          mode="outlined"
+          onPress={() => setMovimientoModalVisible(true)}
+          style={styles.actionButton}
+        >
           Ingreso / egreso
         </Button>
-        <Button mode="contained" onPress={() => setCierreModalVisible(true)} style={styles.actionButton}>
+        <Button
+          icon="lock-check"
+          mode="contained"
+          onPress={() => setCierreModalVisible(true)}
+          style={styles.actionButton}
+        >
           Cerrar turno
         </Button>
       </View>
@@ -161,7 +171,7 @@ function AbrirTurnoForm({ usuarioId, onAbierto }: { usuarioId: string; onAbierto
           {error}
         </Text>
       )}
-      <Button mode="contained" onPress={onSubmit} loading={loading} disabled={loading}>
+      <Button icon="lock-open-variant" mode="contained" onPress={onSubmit} loading={loading} disabled={loading}>
         Abrir turno
       </Button>
     </View>
@@ -217,8 +227,10 @@ function MovimientoCajaForm({
         </Text>
       )}
       <View style={styles.formActions}>
-        <Button onPress={onCancel}>Cancelar</Button>
-        <Button mode="contained" onPress={onSubmit}>
+        <Button icon="close" onPress={onCancel}>
+          Cancelar
+        </Button>
+        <Button icon="content-save" mode="contained" onPress={onSubmit}>
           Guardar
         </Button>
       </View>
@@ -255,7 +267,7 @@ function CierreTurnoForm({ turnoId, onDone, onCancel }: { turnoId: string; onDon
               ? `Sobrante: ${formatMoney(resultado.diferencia)}`
               : `Faltante: ${formatMoney(Math.abs(resultado.diferencia))}`}
         </Text>
-        <Button mode="contained" onPress={onDone}>
+        <Button icon="check" mode="contained" onPress={onDone}>
           Listo
         </Button>
       </View>
@@ -279,8 +291,10 @@ function CierreTurnoForm({ turnoId, onDone, onCancel }: { turnoId: string; onDon
         style={styles.input}
       />
       <View style={styles.formActions}>
-        <Button onPress={onCancel}>Cancelar</Button>
-        <Button mode="contained" onPress={onSubmit}>
+        <Button icon="close" onPress={onCancel}>
+          Cancelar
+        </Button>
+        <Button icon="lock-check" mode="contained" onPress={onSubmit}>
           Confirmar cierre
         </Button>
       </View>

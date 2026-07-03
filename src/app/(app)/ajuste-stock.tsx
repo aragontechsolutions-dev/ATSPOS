@@ -114,7 +114,7 @@ export default function AjusteStockScreen() {
               keyboardType="number-pad"
               style={styles.input}
             />
-            <Button mode="contained" onPress={aplicar}>
+            <Button icon="check" mode="contained" onPress={aplicar}>
               Aplicar
             </Button>
           </Card.Content>

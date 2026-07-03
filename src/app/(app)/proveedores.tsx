@@ -46,7 +46,7 @@ export default function ProveedoresScreen() {
           style={styles.input}
         />
         {error && <Text style={styles.error}>{error}</Text>}
-        <Button mode="contained" onPress={onCrear}>
+        <Button icon="account-plus" mode="contained" onPress={onCrear}>
           Agregar proveedor
         </Button>
       </View>
@@ -61,9 +61,12 @@ export default function ProveedoresScreen() {
           <List.Item
             title={item.nombre}
             description={item.contacto ?? undefined}
+            left={(props) => <List.Icon {...props} icon="account-tie" />}
             right={(props) => (
               <Button
                 {...props}
+                icon="delete"
+                textColor="#B3261E"
                 onPress={async () => {
                   await eliminarProveedor(item.id);
                   cargar();

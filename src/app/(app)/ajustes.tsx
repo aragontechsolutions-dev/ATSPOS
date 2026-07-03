@@ -47,7 +47,7 @@ export default function AjustesScreen() {
       <List.Section>
         <List.Subheader>Mi cuenta</List.Subheader>
         <List.Item title={usuario?.nombre} description={`@${usuario?.username} · ${usuario?.rol}`} />
-        <Button onPress={() => logout()} style={styles.logoutButton}>
+        <Button icon="logout" onPress={() => logout()} style={styles.logoutButton}>
           Cerrar sesión
         </Button>
       </List.Section>
@@ -98,7 +98,7 @@ export default function AjustesScreen() {
                 ))}
               </View>
               {error && <Text style={styles.error}>{error}</Text>}
-              <Button mode="contained" onPress={onCrearUsuario}>
+              <Button icon="account-plus" mode="contained" onPress={onCrearUsuario}>
                 Crear usuario
               </Button>
             </View>
