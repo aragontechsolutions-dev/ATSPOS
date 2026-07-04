@@ -9,6 +9,7 @@ export interface CartItem {
   precioUnitario: number;
   costoUnitario: number;
   stockDisponible: number;
+  unidadMedida: string; // 'unidad' | 'kg'
 }
 
 interface CartState {
@@ -52,6 +53,7 @@ export const useCartStore = create<CartState>((set, get) => ({
             precioUnitario: producto.precioVenta,
             costoUnitario: producto.precioCosto,
             stockDisponible: producto.stockActual,
+            unidadMedida: producto.unidadMedida,
           },
         ],
       };
@@ -73,9 +75,10 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   setCantidad: (productoId, cantidad) =>
     set((state) => ({
+      // Acepta decimales (venta por peso). Ignora valores no positivos.
       items: state.items.map((i) =>
-        i.productoId === productoId
-          ? { ...i, cantidad: Math.max(1, Math.min(cantidad, i.stockDisponible)) }
+        i.productoId === productoId && cantidad > 0
+          ? { ...i, cantidad: Math.min(cantidad, i.stockDisponible) }
           : i,
       ),
     })),

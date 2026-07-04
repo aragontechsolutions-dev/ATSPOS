@@ -1,11 +1,18 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Divider, List, Text, TextInput } from 'react-native-paper';
+import { Button, Dialog, Divider, List, Portal, SegmentedButtons, Text, TextInput } from 'react-native-paper';
 
-import { crearUsuario, listarUsuarios, type UsuarioConRol } from '@/db/repositories/usuarios';
+import {
+  crearUsuario,
+  editarUsuario,
+  listarUsuarios,
+  resetearPassword,
+  setUsuarioActivo,
+  type UsuarioConRol,
+} from '@/db/repositories/usuarios';
 import { auditar } from '@/lib/audit';
-import { ROLES, tienePermiso } from '@/lib/roles';
+import { ROLES, tienePermiso, type RolNombre } from '@/lib/roles';
 import { useSessionStore } from '@/store/session';
 
 export default function AjustesScreen() {
@@ -20,10 +27,26 @@ export default function AjustesScreen() {
   const [password, setPassword] = useState('');
   const [rol, setRol] = useState<typeof ROLES[keyof typeof ROLES]>(ROLES.CAJERO);
   const [error, setError] = useState<string | null>(null);
+  const [gestion, setGestion] = useState<UsuarioConRol | null>(null);
+  const [gestionError, setGestionError] = useState<string | null>(null);
+  const [nuevaPass, setNuevaPass] = useState('');
 
   const cargar = useCallback(() => {
-    if (esAdmin) listarUsuarios().then(setUsuarios);
+    if (esAdmin) listarUsuarios(true).then(setUsuarios);
   }, [esAdmin]);
+
+  async function accion(fn: () => Promise<void>, detalle: string) {
+    setGestionError(null);
+    try {
+      await fn();
+      auditar('Gestión de usuario', detalle);
+      setGestion(null);
+      setNuevaPass('');
+      cargar();
+    } catch (e) {
+      setGestionError(e instanceof Error ? e.message : 'No se pudo completar la acción');
+    }
+  }
 
   useFocusEffect(cargar);
 
@@ -72,7 +95,19 @@ export default function AjustesScreen() {
           <List.Section>
             <List.Subheader>Usuarios</List.Subheader>
             {usuarios.map((item) => (
-              <List.Item key={item.id} title={item.nombre} description={`@${item.username} · ${item.rol}`} />
+              <List.Item
+                key={item.id}
+                title={item.nombre}
+                titleStyle={!item.activo ? styles.inactivo : undefined}
+                description={`@${item.username} · ${item.rol}${item.activo ? '' : ' · inactivo'}`}
+                left={(props) => <List.Icon {...props} icon="account" />}
+                right={(props) => <List.Icon {...props} icon="dots-vertical" />}
+                onPress={() => {
+                  setGestion(item);
+                  setGestionError(null);
+                  setNuevaPass('');
+                }}
+              />
             ))}
 
             <View style={styles.form}>
@@ -114,6 +149,65 @@ export default function AjustesScreen() {
           </List.Section>
         </>
       )}
+
+      <Portal>
+        <Dialog visible={!!gestion} onDismiss={() => setGestion(null)}>
+          <Dialog.Title>{gestion?.nombre}</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="labelLarge" style={styles.gestionLabel}>
+              Rol
+            </Text>
+            <SegmentedButtons
+              value={gestion?.rol ?? ''}
+              onValueChange={(v) =>
+                gestion && accion(() => editarUsuario(gestion.id, { rolNombre: v as RolNombre }), `Rol de @${gestion.username} → ${v}`)
+              }
+              buttons={Object.values(ROLES).map((r) => ({ value: r, label: r }))}
+            />
+
+            <Text variant="labelLarge" style={styles.gestionLabel}>
+              Resetear contraseña
+            </Text>
+            <TextInput
+              label="Nueva contraseña"
+              secureTextEntry
+              value={nuevaPass}
+              onChangeText={setNuevaPass}
+              mode="outlined"
+              dense
+            />
+            <Button
+              onPress={() =>
+                gestion &&
+                (nuevaPass.length >= 6
+                  ? accion(() => resetearPassword(gestion.id, nuevaPass), `Reset contraseña de @${gestion.username}`)
+                  : setGestionError('La contraseña debe tener al menos 6 caracteres'))
+              }
+              style={styles.gestionBtn}
+            >
+              Aplicar nueva contraseña
+            </Button>
+
+            {gestionError && <Text style={styles.error}>{gestionError}</Text>}
+          </Dialog.Content>
+          <Dialog.Actions>
+            {gestion && gestion.id !== usuario?.id && (
+              <Button
+                textColor={gestion.activo ? '#B3261E' : undefined}
+                onPress={() =>
+                  accion(
+                    () => setUsuarioActivo(gestion.id, !gestion.activo),
+                    `${gestion.activo ? 'Desactivar' : 'Activar'} @${gestion.username}`,
+                  )
+                }
+              >
+                {gestion.activo ? 'Desactivar' : 'Activar'}
+              </Button>
+            )}
+            <Button onPress={() => setGestion(null)}>Cerrar</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </ScrollView>
   );
 }
@@ -127,4 +221,7 @@ const styles = StyleSheet.create({
   rolRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   rolButton: { flex: 1 },
   error: { color: '#B00020', marginBottom: 8, textAlign: 'center' },
+  inactivo: { textDecorationLine: 'line-through', opacity: 0.6 },
+  gestionLabel: { marginTop: 12, marginBottom: 6, opacity: 0.8 },
+  gestionBtn: { marginTop: 4 },
 });

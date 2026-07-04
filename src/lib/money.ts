@@ -11,3 +11,11 @@ export function parseMoneyInput(text: string): number {
   if (Number.isNaN(value)) return 0;
   return Math.round(value * 100);
 }
+
+/** Formats a quantity: integer for units, up to 3 decimals for weighed goods. */
+export function formatCantidad(cantidad: number, unidadMedida: string): string {
+  if (unidadMedida === 'kg') {
+    return `${Number.parseFloat(cantidad.toFixed(3))} kg`;
+  }
+  return String(cantidad);
+}

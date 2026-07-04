@@ -46,6 +46,9 @@ export const productos = sqliteTable('productos', {
   // Money is stored in cents (integer) to avoid floating point rounding errors.
   precioCosto: integer('precio_costo').notNull().default(0),
   precioVenta: integer('precio_venta').notNull().default(0),
+  // 'unidad' → cantidades enteras; 'kg' → precioVenta es por kg y las
+  // cantidades pueden ser decimales (SQLite guarda el real en esta columna).
+  unidadMedida: text('unidad_medida').notNull().default('unidad'),
   stockActual: integer('stock_actual').notNull().default(0),
   stockDeposito: integer('stock_deposito').notNull().default(0),
   stockMinimo: integer('stock_minimo').notNull().default(0),
@@ -57,6 +60,33 @@ export const proveedores = sqliteTable('proveedores', {
   id: text('id').primaryKey(),
   nombre: text('nombre').notNull(),
   contacto: text('contacto'),
+  ...syncColumns,
+});
+
+export const clientes = sqliteTable('clientes', {
+  id: text('id').primaryKey(),
+  nombre: text('nombre').notNull(),
+  telefono: text('telefono'),
+  limiteCredito: integer('limite_credito').notNull().default(0),
+  // Cached balance owed (positive = the customer owes money). Recomputed from
+  // movimientos_cliente, which is the source of truth.
+  saldo: integer('saldo').notNull().default(0),
+  activo: integer('activo', { mode: 'boolean' }).notNull().default(true),
+  ...syncColumns,
+});
+
+export const movimientosCliente = sqliteTable('movimientos_cliente', {
+  id: text('id').primaryKey(),
+  clienteId: text('cliente_id')
+    .notNull()
+    .references(() => clientes.id),
+  tipo: text('tipo').notNull(), // cargo (venta fiada) | pago
+  monto: integer('monto').notNull(),
+  referenciaId: text('referencia_id'), // ventaId para cargos
+  fecha: integer('fecha', { mode: 'timestamp_ms' }).notNull(),
+  usuarioId: text('usuario_id')
+    .notNull()
+    .references(() => usuarios.id),
   ...syncColumns,
 });
 
@@ -108,7 +138,8 @@ export const ventas = sqliteTable('ventas', {
   turnoId: text('turno_id')
     .notNull()
     .references(() => turnos.id),
-  metodoPago: text('metodo_pago').notNull(), // efectivo | debito | credito | transferencia
+  clienteId: text('cliente_id').references(() => clientes.id),
+  metodoPago: text('metodo_pago').notNull(), // efectivo | debito | credito | transferencia | fiado
   subtotal: integer('subtotal').notNull(),
   descuento: integer('descuento').notNull().default(0),
   total: integer('total').notNull(),

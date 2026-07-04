@@ -11,6 +11,7 @@ import {
   Dialog,
   Modal,
   Portal,
+  SegmentedButtons,
   Snackbar,
   Text,
   TextInput,
@@ -22,6 +23,7 @@ import {
   eliminarProducto,
   getProductoById,
   type Producto,
+  type UnidadMedida,
 } from '@/db/repositories/productos';
 import { auditar } from '@/lib/audit';
 import { formatMoney, parseMoneyInput } from '@/lib/money';
@@ -198,6 +200,7 @@ function EditarProductoForm({
   const [precioVenta, setPrecioVenta] = useState((producto.precioVenta / 100).toFixed(2));
   const [stockMinimo, setStockMinimo] = useState(String(producto.stockMinimo));
   const [codigoBarras, setCodigoBarras] = useState(producto.codigoBarras ?? '');
+  const [unidadMedida, setUnidadMedida] = useState<UnidadMedida>(producto.unidadMedida as UnidadMedida);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit() {
@@ -212,6 +215,7 @@ function EditarProductoForm({
       precioVenta: parseMoneyInput(precioVenta),
       stockMinimo: Number.parseInt(stockMinimo, 10) || 0,
       codigoBarras: codigoBarras.trim() || null,
+      unidadMedida,
     });
     auditar('Edición de producto', nombre.trim());
     onGuardado();
@@ -241,6 +245,15 @@ function EditarProductoForm({
           style={[styles.input, styles.priceInput]}
         />
       </View>
+      <SegmentedButtons
+        value={unidadMedida}
+        onValueChange={(v) => setUnidadMedida(v as UnidadMedida)}
+        buttons={[
+          { value: 'unidad', label: 'Por unidad', icon: 'numeric' },
+          { value: 'kg', label: 'Por peso (kg)', icon: 'scale' },
+        ]}
+        style={styles.input}
+      />
       <TextInput
         label="Stock mínimo"
         value={stockMinimo}

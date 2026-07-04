@@ -57,6 +57,13 @@ export default function AppTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="clientes"
+        options={{
+          title: 'Clientes',
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="caja"
         options={{
           title: 'Caja',
@@ -82,6 +89,8 @@ export default function AppTabsLayout() {
       <Tabs.Screen name="auditoria" options={{ href: null, title: 'Auditoría' }} />
       <Tabs.Screen name="ventas" options={{ href: null, title: 'Historial de ventas' }} />
       <Tabs.Screen name="venta-detalle" options={{ href: null, title: 'Detalle de venta' }} />
+      <Tabs.Screen name="cliente-detalle" options={{ href: null, title: 'Cliente' }} />
+      <Tabs.Screen name="categorias" options={{ href: null, title: 'Categorías' }} />
     </Tabs>
   );
 }

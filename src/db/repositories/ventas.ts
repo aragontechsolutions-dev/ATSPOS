@@ -4,9 +4,10 @@ import { db } from '@/db/client';
 import { detalleVenta, productos, ventas } from '@/db/schema';
 import { newId } from '@/lib/id';
 
+import { cargarFiadoSync, reversarFiadoSync } from './clientes';
 import { insertarMovimientoSync, recomputeStockActualSync } from './stock';
 
-export type MetodoPago = 'efectivo' | 'debito' | 'credito' | 'transferencia';
+export type MetodoPago = 'efectivo' | 'debito' | 'credito' | 'transferencia' | 'fiado';
 
 export interface ItemCarrito {
   productoId: string;
@@ -24,6 +25,7 @@ export interface NuevaVenta {
   items: ItemCarrito[];
   descuento?: number;
   montoRecibido?: number;
+  clienteId?: string | null;
 }
 
 export interface VentaConfirmada {
@@ -51,6 +53,8 @@ export async function registrarVenta(input: NuevaVenta): Promise<VentaConfirmada
   );
   const descuento = input.descuento ?? 0;
   const total = subtotal - descuento;
+  const esFiado = input.metodoPago === 'fiado';
+  if (esFiado && !input.clienteId) throw new Error('Elegí un cliente para la venta fiada');
   const vuelto = input.montoRecibido != null ? input.montoRecibido - total : null;
 
   const ventaId = newId();
@@ -62,6 +66,7 @@ export async function registrarVenta(input: NuevaVenta): Promise<VentaConfirmada
         fecha: new Date(),
         usuarioId: input.usuarioId,
         turnoId: input.turnoId,
+        clienteId: input.clienteId ?? null,
         metodoPago: input.metodoPago,
         subtotal,
         descuento,
@@ -70,6 +75,10 @@ export async function registrarVenta(input: NuevaVenta): Promise<VentaConfirmada
         vuelto,
       })
       .run();
+
+    if (esFiado && input.clienteId) {
+      cargarFiadoSync(tx, { clienteId: input.clienteId, monto: total, ventaId, usuarioId: input.usuarioId });
+    }
 
     for (const item of input.items) {
       tx.insert(detalleVenta)
@@ -170,6 +179,11 @@ export async function anularVenta(ventaId: string, usuarioId: string, motivo: st
         usuarioId,
       });
       recomputeStockActualSync(tx, linea.productoId);
+    }
+
+    // Si fue fiado, revertir el cargo en la cuenta del cliente.
+    if (venta.clienteId && venta.metodoPago === 'fiado') {
+      reversarFiadoSync(tx, { clienteId: venta.clienteId, monto: venta.total, ventaId, usuarioId });
     }
 
     tx.update(ventas)

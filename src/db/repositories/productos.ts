@@ -6,6 +6,8 @@ import { newId } from '@/lib/id';
 
 export type Producto = typeof productos.$inferSelect;
 
+export type UnidadMedida = 'unidad' | 'kg';
+
 export interface NuevoProducto {
   nombre: string;
   categoriaId?: string | null;
@@ -13,6 +15,7 @@ export interface NuevoProducto {
   precioCosto: number;
   precioVenta: number;
   stockMinimo?: number;
+  unidadMedida?: UnidadMedida;
 }
 
 export async function listarProductos(busqueda?: string): Promise<Producto[]> {
@@ -56,6 +59,7 @@ export async function crearProducto(input: NuevoProducto): Promise<Producto> {
       precioCosto: input.precioCosto,
       precioVenta: input.precioVenta,
       stockMinimo: input.stockMinimo ?? 0,
+      unidadMedida: input.unidadMedida ?? 'unidad',
     })
     .run();
   const creado = await db.query.productos.findFirst({ where: eq(productos.id, id) });

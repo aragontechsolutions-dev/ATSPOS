@@ -15,8 +15,16 @@ export async function listarCategorias(): Promise<Categoria[]> {
 
 export async function crearCategoria(nombre: string): Promise<Categoria> {
   const id = newId();
-  await db.insert(categorias).values({ id, nombre });
+  await db.insert(categorias).values({ id, nombre: nombre.trim() });
   const creada = await db.query.categorias.findFirst({ where: eq(categorias.id, id) });
   if (!creada) throw new Error('No se pudo crear la categoría');
   return creada;
+}
+
+export async function actualizarCategoria(id: string, nombre: string): Promise<void> {
+  await db.update(categorias).set({ nombre: nombre.trim(), updatedAt: new Date() }).where(eq(categorias.id, id));
+}
+
+export async function eliminarCategoria(id: string): Promise<void> {
+  await db.update(categorias).set({ deletedAt: new Date() }).where(eq(categorias.id, id));
 }

@@ -1,11 +1,22 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { Button, Divider, FAB, List, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import {
+  Button,
+  Divider,
+  FAB,
+  IconButton,
+  List,
+  Modal,
+  Portal,
+  SegmentedButtons,
+  Text,
+  TextInput,
+} from 'react-native-paper';
 
 import { BarcodeScannerModal } from '@/components/barcode-scanner';
 import { listarCategorias, type Categoria } from '@/db/repositories/categorias';
-import { crearProducto, listarProductos, type Producto } from '@/db/repositories/productos';
+import { crearProducto, listarProductos, type Producto, type UnidadMedida } from '@/db/repositories/productos';
 import { formatMoney, parseMoneyInput } from '@/lib/money';
 
 export default function ProductosScreen() {
@@ -26,14 +37,18 @@ export default function ProductosScreen() {
 
   return (
     <View style={styles.container}>
-      <TextInput
-        placeholder="Buscar por nombre o código de barras"
-        value={busqueda}
-        onChangeText={setBusqueda}
-        mode="outlined"
-        style={styles.search}
-        right={<TextInput.Icon icon="magnify" />}
-      />
+      <View style={styles.searchRow}>
+        <TextInput
+          placeholder="Buscar por nombre o código"
+          value={busqueda}
+          onChangeText={setBusqueda}
+          mode="outlined"
+          dense
+          style={styles.searchInput}
+          right={<TextInput.Icon icon="magnify" />}
+        />
+        <IconButton icon="tag-multiple" mode="contained-tonal" onPress={() => router.push('/categorias')} />
+      </View>
 
       <FlatList
         data={productos}
@@ -124,6 +139,7 @@ function NuevoProductoForm({
   const [precioVenta, setPrecioVenta] = useState('');
   const [stockMinimo, setStockMinimo] = useState('0');
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
+  const [unidadMedida, setUnidadMedida] = useState<UnidadMedida>('unidad');
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit() {
@@ -140,6 +156,7 @@ function NuevoProductoForm({
         precioCosto: parseMoneyInput(precioCosto),
         precioVenta: parseMoneyInput(precioVenta),
         stockMinimo: Number.parseInt(stockMinimo, 10) || 0,
+        unidadMedida,
       });
       onCreated();
     } catch (e) {
@@ -171,7 +188,7 @@ function NuevoProductoForm({
           style={[styles.input, styles.priceInput]}
         />
         <TextInput
-          label="Precio venta"
+          label={unidadMedida === 'kg' ? 'Precio por kg' : 'Precio venta'}
           value={precioVenta}
           onChangeText={setPrecioVenta}
           mode="outlined"
@@ -179,6 +196,15 @@ function NuevoProductoForm({
           style={[styles.input, styles.priceInput]}
         />
       </View>
+      <SegmentedButtons
+        value={unidadMedida}
+        onValueChange={(v) => setUnidadMedida(v as UnidadMedida)}
+        buttons={[
+          { value: 'unidad', label: 'Por unidad', icon: 'numeric' },
+          { value: 'kg', label: 'Por peso (kg)', icon: 'scale' },
+        ]}
+        style={styles.input}
+      />
       <TextInput
         label="Stock mínimo"
         value={stockMinimo}
@@ -221,7 +247,8 @@ function NuevoProductoForm({
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 12 },
-  search: { marginBottom: 8 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
+  searchInput: { flex: 1 },
   row: { flexDirection: 'row', paddingVertical: 10, alignItems: 'center' },
   rowInfo: { flex: 1 },
   rowSub: { opacity: 0.7, marginTop: 2 },

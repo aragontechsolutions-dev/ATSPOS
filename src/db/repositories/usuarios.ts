@@ -12,6 +12,7 @@ export interface UsuarioConRol {
   username: string;
   rol: RolNombre;
   debeCambiarPassword: boolean;
+  activo: boolean;
 }
 
 async function toUsuarioConRol(usuario: typeof usuarios.$inferSelect): Promise<UsuarioConRol> {
@@ -23,6 +24,7 @@ async function toUsuarioConRol(usuario: typeof usuarios.$inferSelect): Promise<U
     username: usuario.username,
     rol: rol.nombre as RolNombre,
     debeCambiarPassword: usuario.debeCambiarPassword,
+    activo: usuario.activo,
   };
 }
 
@@ -74,10 +76,55 @@ export async function crearUsuario(input: {
     debeCambiarPassword: true,
   });
 
-  return { id, nombre: input.nombre, username: input.username, rol: input.rolNombre, debeCambiarPassword: true };
+  return {
+    id,
+    nombre: input.nombre,
+    username: input.username,
+    rol: input.rolNombre,
+    debeCambiarPassword: true,
+    activo: true,
+  };
 }
 
-export async function listarUsuarios(): Promise<UsuarioConRol[]> {
-  const filas = await db.query.usuarios.findMany();
-  return Promise.all(filas.filter((u) => u.activo).map(toUsuarioConRol));
+export async function listarUsuarios(incluirInactivos = false): Promise<UsuarioConRol[]> {
+  const filas = await db.query.usuarios.findMany({ orderBy: (u, { asc }) => [asc(u.nombre)] });
+  return Promise.all(filas.filter((u) => incluirInactivos || u.activo).map(toUsuarioConRol));
+}
+
+export async function editarUsuario(id: string, cambios: { nombre?: string; rolNombre?: RolNombre }): Promise<void> {
+  const set: Partial<typeof usuarios.$inferInsert> = { updatedAt: new Date() };
+  if (cambios.nombre !== undefined) set.nombre = cambios.nombre.trim();
+  if (cambios.rolNombre) {
+    const rol = await db.query.roles.findFirst({ where: eq(roles.nombre, cambios.rolNombre) });
+    if (!rol) throw new Error(`Rol desconocido: ${cambios.rolNombre}`);
+    set.rolId = rol.id;
+  }
+  await db.update(usuarios).set(set).where(eq(usuarios.id, id));
+}
+
+export async function resetearPassword(id: string, nuevaPassword: string): Promise<void> {
+  await db
+    .update(usuarios)
+    .set({ passwordHash: await hashPassword(nuevaPassword), debeCambiarPassword: true, updatedAt: new Date() })
+    .where(eq(usuarios.id, id));
+}
+
+async function contarAdminsActivos(): Promise<number> {
+  const rolAdmin = await db.query.roles.findFirst({ where: eq(roles.nombre, 'admin') });
+  if (!rolAdmin) return 0;
+  const filas = await db.query.usuarios.findMany({ where: eq(usuarios.rolId, rolAdmin.id) });
+  return filas.filter((u) => u.activo).length;
+}
+
+export async function setUsuarioActivo(id: string, activo: boolean): Promise<void> {
+  if (!activo) {
+    const usuario = await db.query.usuarios.findFirst({ where: eq(usuarios.id, id) });
+    if (usuario) {
+      const rol = await db.query.roles.findFirst({ where: eq(roles.id, usuario.rolId) });
+      if (rol?.nombre === 'admin' && (await contarAdminsActivos()) <= 1) {
+        throw new Error('No podés desactivar al último administrador');
+      }
+    }
+  }
+  await db.update(usuarios).set({ activo, updatedAt: new Date() }).where(eq(usuarios.id, id));
 }

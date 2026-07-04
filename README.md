@@ -47,6 +47,13 @@ expo-sqlite + Drizzle ORM, y React Native Paper.
 - **Editar y eliminar productos** desde el detalle del producto.
 - **Auto-logout por inactividad** (5 min): cierra la sesión aunque la app esté en
   segundo plano o se haya cerrado; al volver obliga a iniciar sesión de nuevo.
+- **Fiado / cuenta corriente de clientes**: método de pago "fiado" que carga la venta a
+  la cuenta del cliente; pantalla de Clientes con saldo, movimientos y registro de pagos
+  (que ingresan a la caja si hay turno abierto).
+- **Venta por peso (kg)**: productos por unidad o por peso, con cantidades decimales.
+- **Gestión de categorías** y **gestión completa de usuarios** (editar rol, resetear
+  contraseña, activar/desactivar, con protección del último administrador).
+- **Linterna** en el escáner de QR.
 
 Pendiente para etapas siguientes: sincronización multi-dispositivo.
 

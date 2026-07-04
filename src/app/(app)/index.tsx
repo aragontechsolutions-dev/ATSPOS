@@ -17,6 +17,7 @@ import {
 
 import { BarcodeScannerModal } from '@/components/barcode-scanner';
 import { turnoAbiertoDe, type Turno } from '@/db/repositories/caja';
+import { crearCliente, listarClientes, type Cliente } from '@/db/repositories/clientes';
 import {
   buscarPorCodigoBarras,
   getProductoById,
@@ -24,7 +25,7 @@ import {
   type Producto,
 } from '@/db/repositories/productos';
 import { registrarVenta, type MetodoPago } from '@/db/repositories/ventas';
-import { formatMoney, parseMoneyInput } from '@/lib/money';
+import { formatCantidad, formatMoney, parseMoneyInput } from '@/lib/money';
 import { parseContenidoQr } from '@/lib/qr';
 import { imprimirTicket, type TicketData } from '@/lib/ticket';
 import { useCartStore } from '@/store/cart';
@@ -39,9 +40,12 @@ export default function VentaScreen() {
   const [scannerVisible, setScannerVisible] = useState(false);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [editarCantidad, setEditarCantidad] = useState<{ productoId: string; nombre: string; valor: string } | null>(
-    null,
-  );
+  const [editarCantidad, setEditarCantidad] = useState<{
+    productoId: string;
+    nombre: string;
+    valor: string;
+    unidadMedida: string;
+  } | null>(null);
 
   const { items, incrementar, decrementar, setCantidad, quitar, addProducto } = useCartStore();
   // Total derivado de items para que se recalcule en cada cambio del carrito.
@@ -71,7 +75,12 @@ export default function VentaScreen() {
       return;
     }
     addProducto(producto);
-    setAviso(`Agregado: ${producto.nombre}`);
+    // Para productos por peso, pedir el peso apenas se agregan.
+    if (producto.unidadMedida === 'kg' && !yaEnCarrito) {
+      setEditarCantidad({ productoId: producto.id, nombre: producto.nombre, valor: '', unidadMedida: 'kg' });
+    } else {
+      setAviso(`Agregado: ${producto.nombre}`);
+    }
   }
 
   async function onScanned(codigo: string) {
@@ -166,7 +175,8 @@ export default function VentaScreen() {
             <View style={styles.cartInfo}>
               <Text variant="bodyLarge">{item.nombre}</Text>
               <Text variant="bodySmall" style={styles.cartSub}>
-                {formatMoney(item.precioUnitario)} c/u · {formatMoney(item.precioUnitario * item.cantidad)}
+                {formatMoney(item.precioUnitario)}
+                {item.unidadMedida === 'kg' ? '/kg' : ' c/u'} · {formatMoney(item.precioUnitario * item.cantidad)}
               </Text>
             </View>
             <View style={styles.qtyControls}>
@@ -175,10 +185,15 @@ export default function VentaScreen() {
                 variant="titleMedium"
                 style={styles.qtyValue}
                 onPress={() =>
-                  setEditarCantidad({ productoId: item.productoId, nombre: item.nombre, valor: String(item.cantidad) })
+                  setEditarCantidad({
+                    productoId: item.productoId,
+                    nombre: item.nombre,
+                    valor: String(item.cantidad),
+                    unidadMedida: item.unidadMedida,
+                  })
                 }
               >
-                {item.cantidad}
+                {formatCantidad(item.cantidad, item.unidadMedida)}
               </Text>
               <IconButton icon="plus" size={18} mode="outlined" onPress={() => incrementar(item.productoId)} />
             </View>
@@ -223,19 +238,26 @@ export default function VentaScreen() {
         </Modal>
 
         <Dialog visible={!!editarCantidad} onDismiss={() => setEditarCantidad(null)}>
-          <Dialog.Title>Cantidad</Dialog.Title>
+          <Dialog.Title>{editarCantidad?.unidadMedida === 'kg' ? 'Peso (kg)' : 'Cantidad'}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium" style={styles.dialogNombre}>
               {editarCantidad?.nombre}
             </Text>
             <TextInput
-              label="Unidades"
+              label={editarCantidad?.unidadMedida === 'kg' ? 'Kilos' : 'Unidades'}
               value={editarCantidad?.valor ?? ''}
               onChangeText={(t) =>
-                setEditarCantidad((prev) => (prev ? { ...prev, valor: t.replace(/[^0-9]/g, '') } : prev))
+                setEditarCantidad((prev) => {
+                  if (!prev) return prev;
+                  const limpio =
+                    prev.unidadMedida === 'kg'
+                      ? t.replace(',', '.').replace(/[^0-9.]/g, '')
+                      : t.replace(/[^0-9]/g, '');
+                  return { ...prev, valor: limpio };
+                })
               }
               mode="outlined"
-              keyboardType="number-pad"
+              keyboardType={editarCantidad?.unidadMedida === 'kg' ? 'decimal-pad' : 'number-pad'}
               autoFocus
             />
           </Dialog.Content>
@@ -245,7 +267,7 @@ export default function VentaScreen() {
               mode="contained"
               onPress={() => {
                 if (editarCantidad) {
-                  const n = Number.parseInt(editarCantidad.valor, 10);
+                  const n = Number.parseFloat(editarCantidad.valor);
                   if (n > 0) setCantidad(editarCantidad.productoId, n);
                 }
                 setEditarCantidad(null);
@@ -281,6 +303,9 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) 
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('efectivo');
   const [descuentoInput, setDescuentoInput] = useState('');
   const [montoRecibidoInput, setMontoRecibidoInput] = useState('');
+  const [cliente, setCliente] = useState<Cliente | null>(null);
+  const [busquedaCliente, setBusquedaCliente] = useState('');
+  const [clientesResult, setClientesResult] = useState<Cliente[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [confirmada, setConfirmada] = useState<VentaConfirmadaUI | null>(null);
@@ -290,10 +315,28 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) 
   const montoRecibido = metodoPago === 'efectivo' ? parseMoneyInput(montoRecibidoInput) : total;
   const vuelto = metodoPago === 'efectivo' ? montoRecibido - total : 0;
   const faltaEfectivo = metodoPago === 'efectivo' && montoRecibido < total;
+  const faltaCliente = metodoPago === 'fiado' && !cliente;
+
+  async function buscarCliente(texto: string) {
+    setBusquedaCliente(texto);
+    setClientesResult(texto.trim() ? await listarClientes(texto) : []);
+  }
+
+  async function crearYSeleccionar() {
+    if (!busquedaCliente.trim()) return;
+    const nuevo = await crearCliente({ nombre: busquedaCliente.trim() });
+    setCliente(nuevo);
+    setBusquedaCliente('');
+    setClientesResult([]);
+  }
 
   async function confirmar() {
     if (metodoPago === 'efectivo' && montoRecibido < total) {
       setError('El monto recibido es menor al total');
+      return;
+    }
+    if (faltaCliente) {
+      setError('Elegí un cliente para la venta fiada');
       return;
     }
     setError(null);
@@ -312,6 +355,7 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) 
         metodoPago,
         descuento,
         montoRecibido: metodoPago === 'efectivo' ? montoRecibido : undefined,
+        clienteId: metodoPago === 'fiado' ? cliente?.id : undefined,
         items: itemsVenta,
       });
       setConfirmada({
@@ -326,7 +370,7 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) 
           subtotal: resultado.subtotal,
           descuento: resultado.descuento,
           total: resultado.total,
-          metodoPago,
+          metodoPago: metodoPago === 'fiado' && cliente ? `fiado · ${cliente.nombre}` : metodoPago,
           montoRecibido: metodoPago === 'efectivo' ? montoRecibido : null,
           vuelto: resultado.vuelto,
         },
@@ -376,7 +420,7 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) 
       />
 
       <RadioButton.Group onValueChange={(v) => setMetodoPago(v as MetodoPago)} value={metodoPago}>
-        {(['efectivo', 'debito', 'credito', 'transferencia'] as MetodoPago[]).map((m) => (
+        {(['efectivo', 'debito', 'credito', 'transferencia', 'fiado'] as MetodoPago[]).map((m) => (
           <RadioButton.Item key={m} label={m} value={m} />
         ))}
       </RadioButton.Group>
@@ -404,6 +448,49 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) 
         </>
       )}
 
+      {metodoPago === 'fiado' && (
+        <View style={styles.fiadoBox}>
+          {cliente ? (
+            <View style={styles.clienteSel}>
+              <Text variant="bodyLarge">
+                Cliente: {cliente.nombre}
+                {cliente.saldo > 0 ? ` (debe ${formatMoney(cliente.saldo)})` : ''}
+              </Text>
+              <Button compact onPress={() => setCliente(null)}>
+                Cambiar
+              </Button>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                label="Buscar cliente"
+                value={busquedaCliente}
+                onChangeText={buscarCliente}
+                mode="outlined"
+                style={styles.input}
+              />
+              {clientesResult.map((c) => (
+                <List.Item
+                  key={c.id}
+                  title={c.nombre}
+                  description={c.saldo > 0 ? `Debe ${formatMoney(c.saldo)}` : 'Al día'}
+                  onPress={() => {
+                    setCliente(c);
+                    setBusquedaCliente('');
+                    setClientesResult([]);
+                  }}
+                />
+              ))}
+              {busquedaCliente.trim().length > 0 && clientesResult.length === 0 && (
+                <Button icon="account-plus" onPress={crearYSeleccionar}>
+                  Crear cliente "{busquedaCliente.trim()}"
+                </Button>
+              )}
+            </>
+          )}
+        </View>
+      )}
+
       {error && (
         <Text style={styles.error} variant="bodyMedium">
           {error}
@@ -419,7 +506,7 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) 
           mode="contained"
           onPress={confirmar}
           loading={procesando}
-          disabled={procesando || faltaEfectivo}
+          disabled={procesando || faltaEfectivo || faltaCliente}
         >
           Confirmar
         </Button>
@@ -452,6 +539,8 @@ const styles = StyleSheet.create({
   vuelto: { textAlign: 'center', marginTop: 8, color: '#0B6E4F' },
   falta: { textAlign: 'center', marginTop: 8, color: '#B3261E' },
   dialogNombre: { marginBottom: 12 },
+  fiadoBox: { marginTop: 4 },
+  clienteSel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
   error: { color: '#B00020', marginTop: 8, textAlign: 'center' },
   confirmTitle: { textAlign: 'center', marginBottom: 12 },
