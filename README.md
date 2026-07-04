@@ -54,6 +54,9 @@ expo-sqlite + Drizzle ORM, y React Native Paper.
 - **Gestión de categorías** y **gestión completa de usuarios** (editar rol, resetear
   contraseña, activar/desactivar, con protección del último administrador).
 - **Linterna** en el escáner de QR.
+- **Importación masiva de productos desde Excel/CSV**: planilla de ejemplo descargable,
+  carga guiada en 3 pasos, revisión previa con errores y alta/actualización (crea
+  categorías y stock inicial de los productos nuevos).
 
 Pendiente para etapas siguientes: sincronización multi-dispositivo.
 

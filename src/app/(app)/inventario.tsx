@@ -45,6 +45,13 @@ export default function InventarioScreen() {
           left={(props) => <List.Icon {...props} icon="account-tie" />}
           onPress={() => router.push('/proveedores')}
         />
+        <Divider />
+        <List.Item
+          title="Importar productos desde Excel"
+          description="Cargá muchos productos de una con una planilla"
+          left={(props) => <List.Icon {...props} icon="file-import" />}
+          onPress={() => router.push('/importar-productos')}
+        />
       </Card>
 
       <Text variant="titleMedium" style={styles.sectionTitle}>
