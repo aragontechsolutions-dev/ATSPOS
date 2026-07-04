@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { Button, Divider, FAB, List, Modal, Portal, Text, TextInput } from 'react-native-paper';
@@ -9,6 +9,7 @@ import { crearProducto, listarProductos, type Producto } from '@/db/repositories
 import { formatMoney, parseMoneyInput } from '@/lib/money';
 
 export default function ProductosScreen() {
+  const router = useRouter();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [busqueda, setBusqueda] = useState('');
@@ -44,6 +45,7 @@ export default function ProductosScreen() {
             <List.Item
               title={item.nombre}
               description={`${formatMoney(item.precioVenta)} · Stock: ${item.stockActual}${bajoStock ? ' · bajo stock' : ''}`}
+              onPress={() => router.push(`/producto-qr?id=${item.id}`)}
               left={(props) => (
                 <List.Icon
                   {...props}
@@ -51,6 +53,7 @@ export default function ProductosScreen() {
                   color={bajoStock ? '#B3261E' : undefined}
                 />
               )}
+              right={(props) => <List.Icon {...props} icon="qrcode" />}
             />
           );
         }}
@@ -151,7 +154,7 @@ function NuevoProductoForm({
       </Text>
       <TextInput label="Nombre" value={nombre} onChangeText={setNombre} mode="outlined" style={styles.input} />
       <TextInput
-        label="Código de barras"
+        label="Código externo (opcional)"
         value={codigoBarras}
         onChangeText={onCodigoBarrasChange}
         mode="outlined"

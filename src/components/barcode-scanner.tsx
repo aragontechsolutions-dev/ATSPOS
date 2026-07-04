@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 
-const BARCODE_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'qr'];
+// QR is the primary format used for product labels; the common linear barcodes
+// stay enabled so externally-labelled products can still be scanned.
+const BARCODE_TYPES: BarcodeType[] = ['qr', 'ean13', 'ean8', 'code128', 'upc_a'];
 
 interface Props {
   visible: boolean;
@@ -41,7 +43,7 @@ export function BarcodeScannerModal({ visible, onScanned, onClose }: Props) {
       <View style={styles.container}>
         {!permission?.granted ? (
           <View style={styles.center}>
-            <Text style={styles.message}>Necesitamos permiso de cámara para escanear códigos de barras.</Text>
+            <Text style={styles.message}>Necesitamos permiso de cámara para escanear códigos QR.</Text>
             <Button mode="contained" onPress={requestPermission} style={styles.button}>
               Dar permiso
             </Button>

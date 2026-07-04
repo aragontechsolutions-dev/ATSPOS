@@ -16,9 +16,15 @@ import {
 
 import { BarcodeScannerModal } from '@/components/barcode-scanner';
 import { turnoAbiertoDe, type Turno } from '@/db/repositories/caja';
-import { buscarPorCodigoBarras, listarProductos, type Producto } from '@/db/repositories/productos';
+import {
+  buscarPorCodigoBarras,
+  getProductoById,
+  listarProductos,
+  type Producto,
+} from '@/db/repositories/productos';
 import { registrarVenta, type MetodoPago } from '@/db/repositories/ventas';
 import { formatMoney, parseMoneyInput } from '@/lib/money';
+import { parseContenidoQr } from '@/lib/qr';
 import { useCartStore } from '@/store/cart';
 import { useSessionStore } from '@/store/session';
 
@@ -63,7 +69,8 @@ export default function VentaScreen() {
 
   async function onScanned(codigo: string) {
     setScannerVisible(false);
-    const producto = await buscarPorCodigoBarras(codigo);
+    const productId = parseContenidoQr(codigo);
+    const producto = productId ? await getProductoById(productId) : await buscarPorCodigoBarras(codigo);
     if (producto) {
       agregarAlCarrito(producto);
     } else {

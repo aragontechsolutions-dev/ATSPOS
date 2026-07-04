@@ -26,6 +26,13 @@ export async function listarProductos(busqueda?: string): Promise<Producto[]> {
   return db.query.productos.findMany({ where: filtro, orderBy: (p, { asc }) => [asc(p.nombre)] });
 }
 
+export async function getProductoById(id: string): Promise<Producto | null> {
+  const producto = await db.query.productos.findFirst({
+    where: and(eq(productos.id, id), isNull(productos.deletedAt)),
+  });
+  return producto ?? null;
+}
+
 export async function buscarPorCodigoBarras(codigo: string): Promise<Producto | null> {
   const producto = await db.query.productos.findFirst({
     where: and(eq(productos.codigoBarras, codigo), isNull(productos.deletedAt)),

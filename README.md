@@ -11,7 +11,8 @@ expo-sqlite + Drizzle ORM, y React Native Paper.
   `deleted_at` preparadas para una futura sincronización multi-dispositivo.
 - Login local con contraseña hasheada (bcryptjs) y RBAC por rol (`admin`, `cajero`,
   `supervisor`).
-- Catálogo de productos con alta y escaneo de código de barras.
+- Catálogo de productos con alta y generación/escaneo de código QR por producto
+  (imprimible como etiqueta con nombre y precio, exportable como imagen).
 - Pantalla de venta (POS): búsqueda/escaneo, carrito, método de pago, cálculo de vuelto,
   descuento de stock transaccional vía event-sourcing (`movimientos_stock`).
 - Gestión de caja: apertura de turno con fondo inicial, ingresos/egresos, cierre con arqueo
