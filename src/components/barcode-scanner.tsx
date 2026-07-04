@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions, type BarcodeType } from 'expo-camera';
 import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
-import { Button, Text } from 'react-native-paper';
+import { Button, IconButton, Text } from 'react-native-paper';
 
 // QR is the primary format used for product labels; the common linear barcodes
 // stay enabled so externally-labelled products can still be scanned.
@@ -16,6 +16,7 @@ interface Props {
 export function BarcodeScannerModal({ visible, onScanned, onClose }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [locked, setLocked] = useState(false);
+  const [torch, setTorch] = useState(false);
   // Some Samsung/Xiaomi devices show a black preview if CameraView mounts
   // right as the modal animation starts; a short delay avoids it.
   const [readyToMount, setReadyToMount] = useState(false);
@@ -24,6 +25,7 @@ export function BarcodeScannerModal({ visible, onScanned, onClose }: Props) {
     if (!visible) {
       setReadyToMount(false);
       setLocked(false);
+      setTorch(false);
       return;
     }
     const timeout = setTimeout(() => setReadyToMount(true), 200);
@@ -57,11 +59,20 @@ export function BarcodeScannerModal({ visible, onScanned, onClose }: Props) {
               <CameraView
                 style={StyleSheet.absoluteFill}
                 facing="back"
+                enableTorch={torch}
                 barcodeScannerSettings={{ barcodeTypes: BARCODE_TYPES }}
                 onBarcodeScanned={(result) => handleScan(result.data)}
               />
             )}
             <View style={styles.overlay}>
+              <IconButton
+                icon={torch ? 'flashlight' : 'flashlight-off'}
+                mode="contained"
+                size={32}
+                onPress={() => setTorch((t) => !t)}
+                accessibilityLabel={torch ? 'Apagar linterna' : 'Encender linterna'}
+                style={styles.torchButton}
+              />
               <Button mode="contained" onPress={onClose} style={styles.button}>
                 Cancelar
               </Button>
@@ -79,4 +90,5 @@ const styles = StyleSheet.create({
   overlay: { position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center' },
   message: { color: 'white', textAlign: 'center', marginBottom: 16 },
   button: { marginTop: 8 },
+  torchButton: { marginBottom: 4 },
 });
