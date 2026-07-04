@@ -1,20 +1,39 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Banner, Card, Divider, List, Text } from 'react-native-paper';
+import { ActivityIndicator, Banner, Card, Divider, List, Snackbar, Text } from 'react-native-paper';
 
-import { listarBajoStock, type Producto } from '@/db/repositories/productos';
+import { listarBajoStock, listarProductos, type Producto } from '@/db/repositories/productos';
+import { imprimirHojaEtiquetas } from '@/lib/etiquetas';
 import { formatMoney } from '@/lib/money';
 
 export default function InventarioScreen() {
   const router = useRouter();
   const [bajoStock, setBajoStock] = useState<Producto[]>([]);
+  const [generando, setGenerando] = useState(false);
+  const [snackbar, setSnackbar] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       listarBajoStock().then(setBajoStock);
     }, []),
   );
+
+  async function onEtiquetas() {
+    setGenerando(true);
+    try {
+      const productos = await listarProductos();
+      if (productos.length === 0) {
+        setSnackbar('No hay productos para imprimir');
+        return;
+      }
+      await imprimirHojaEtiquetas(productos);
+    } catch (e) {
+      setSnackbar(e instanceof Error ? e.message : 'No se pudo generar la hoja de etiquetas');
+    } finally {
+      setGenerando(false);
+    }
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -52,6 +71,16 @@ export default function InventarioScreen() {
           left={(props) => <List.Icon {...props} icon="file-import" />}
           onPress={() => router.push('/importar-productos')}
         />
+        <Divider />
+        <List.Item
+          title="Imprimir hoja de etiquetas QR"
+          description="Un PDF con el QR, nombre y precio de todos los productos"
+          left={(props) => <List.Icon {...props} icon="qrcode" />}
+          right={(props) =>
+            generando ? <ActivityIndicator {...props} /> : <List.Icon {...props} icon="printer" />
+          }
+          onPress={generando ? undefined : onEtiquetas}
+        />
       </Card>
 
       <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -75,6 +104,10 @@ export default function InventarioScreen() {
           ))}
         </Card>
       )}
+
+      <Snackbar visible={!!snackbar} onDismiss={() => setSnackbar(null)} duration={3000}>
+        {snackbar ?? ''}
+      </Snackbar>
     </ScrollView>
   );
 }

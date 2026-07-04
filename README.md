@@ -57,6 +57,8 @@ expo-sqlite + Drizzle ORM, y React Native Paper.
 - **Importación masiva de productos desde Excel/CSV**: planilla de ejemplo descargable,
   carga guiada en 3 pasos, revisión previa con errores y alta/actualización (crea
   categorías y stock inicial de los productos nuevos).
+- **Hoja de etiquetas QR**: PDF imprimible con el QR, nombre y precio de todos los
+  productos en grilla (ideal tras una importación masiva).
 
 Pendiente para etapas siguientes: sincronización multi-dispositivo.
 
