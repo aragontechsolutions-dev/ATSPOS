@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 
+import { CREDITO } from './brand';
 import { formatMoney } from './money';
 
 export interface TicketItem {
@@ -73,6 +74,7 @@ function ticketHtml(data: TicketData): string {
         ${efectivo}
         <hr/>
         <div style="text-align:center;">¡Gracias por su compra!</div>
+        <div style="text-align:center;font-size:11px;margin-top:8px;color:#555;">${CREDITO}</div>
       </body>
     </html>`;
 }

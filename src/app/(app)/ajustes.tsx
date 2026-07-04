@@ -12,6 +12,7 @@ import {
   type UsuarioConRol,
 } from '@/db/repositories/usuarios';
 import { auditar } from '@/lib/audit';
+import { APP_NAME, CREDITO } from '@/lib/brand';
 import { ROLES, tienePermiso, type RolNombre } from '@/lib/roles';
 import { useSessionStore } from '@/store/session';
 
@@ -150,6 +151,14 @@ export default function AjustesScreen() {
         </>
       )}
 
+      <Divider />
+      <View style={styles.acerca}>
+        <Text variant="titleMedium">{APP_NAME}</Text>
+        <Text variant="bodySmall" style={styles.acercaText}>
+          {CREDITO}
+        </Text>
+      </View>
+
       <Portal>
         <Dialog visible={!!gestion} onDismiss={() => setGestion(null)}>
           <Dialog.Title>{gestion?.nombre}</Dialog.Title>
@@ -224,4 +233,6 @@ const styles = StyleSheet.create({
   inactivo: { textDecorationLine: 'line-through', opacity: 0.6 },
   gestionLabel: { marginTop: 12, marginBottom: 6, opacity: 0.8 },
   gestionBtn: { marginTop: 4 },
+  acerca: { alignItems: 'center', padding: 24, gap: 4 },
+  acercaText: { textAlign: 'center', opacity: 0.6 },
 });

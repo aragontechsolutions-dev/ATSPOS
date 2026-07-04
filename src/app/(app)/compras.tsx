@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Card, Divider, IconButton, SegmentedButtons, Text, TextInput } from 'react-native-paper';
+import { Button, Card, Dialog, Divider, IconButton, Portal, SegmentedButtons, Text, TextInput } from 'react-native-paper';
 
 import { ProductSearch } from '@/components/product-search';
 import { registrarCompra, type LineaCompra } from '@/db/repositories/compras';
@@ -22,6 +22,9 @@ export default function ComprasScreen() {
   const [lineas, setLineas] = useState<LineaEditable[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [editarCantidad, setEditarCantidad] = useState<{ productoId: string; nombre: string; valor: string } | null>(
+    null,
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -109,10 +112,24 @@ export default function ComprasScreen() {
               <IconButton
                 icon="minus"
                 size={18}
+                mode="outlined"
                 onPress={() => actualizarLinea(l.productoId, { cantidad: Math.max(1, l.cantidad - 1) })}
               />
-              <Text variant="bodyLarge">{l.cantidad}</Text>
-              <IconButton icon="plus" size={18} onPress={() => actualizarLinea(l.productoId, { cantidad: l.cantidad + 1 })} />
+              <Text
+                variant="titleMedium"
+                style={styles.qtyValue}
+                onPress={() =>
+                  setEditarCantidad({ productoId: l.productoId, nombre: l.nombre, valor: String(l.cantidad) })
+                }
+              >
+                {l.cantidad}
+              </Text>
+              <IconButton
+                icon="plus"
+                size={18}
+                mode="outlined"
+                onPress={() => actualizarLinea(l.productoId, { cantidad: l.cantidad + 1 })}
+              />
             </View>
             <TextInput
               label="Costo unitario"
@@ -150,6 +167,42 @@ export default function ComprasScreen() {
       >
         Confirmar compra
       </Button>
+
+      <Portal>
+        <Dialog visible={!!editarCantidad} onDismiss={() => setEditarCantidad(null)}>
+          <Dialog.Title>Cantidad</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium" style={styles.dialogNombre}>
+              {editarCantidad?.nombre}
+            </Text>
+            <TextInput
+              label="Unidades"
+              value={editarCantidad?.valor ?? ''}
+              onChangeText={(t) =>
+                setEditarCantidad((prev) => (prev ? { ...prev, valor: t.replace(/[^0-9]/g, '') } : prev))
+              }
+              mode="outlined"
+              keyboardType="number-pad"
+              autoFocus
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setEditarCantidad(null)}>Cancelar</Button>
+            <Button
+              mode="contained"
+              onPress={() => {
+                if (editarCantidad) {
+                  const n = Number.parseInt(editarCantidad.valor, 10);
+                  if (n > 0) actualizarLinea(editarCantidad.productoId, { cantidad: n });
+                }
+                setEditarCantidad(null);
+              }}
+            >
+              Aceptar
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </ScrollView>
   );
 }
@@ -162,8 +215,10 @@ const styles = StyleSheet.create({
   lineCard: { marginTop: 8 },
   lineContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qtyControls: { flexDirection: 'row', alignItems: 'center' },
+  qtyValue: { minWidth: 40, textAlign: 'center', textDecorationLine: 'underline' },
   costoInput: { flex: 1 },
   lineTotal: { width: 80, textAlign: 'right' },
+  dialogNombre: { marginBottom: 12 },
   divider: { marginTop: 12 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 12 },
   error: { color: '#B00020', textAlign: 'center' },

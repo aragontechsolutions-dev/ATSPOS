@@ -259,21 +259,48 @@ function MovimientoCajaForm({
 function CierreTurnoForm({ turnoId, onDone, onCancel }: { turnoId: string; onDone: () => void; onCancel: () => void }) {
   const [efectivoEsperado, setEfectivoEsperado] = useState<number | null>(null);
   const [contado, setContado] = useState('');
+  const [reconciliando, setReconciliando] = useState(false);
   const [resultado, setResultado] = useState<{ diferencia: number } | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      previsualizarCierre(turnoId).then(setEfectivoEsperado);
-    }, [turnoId]),
-  );
+  const recargarEsperado = useCallback(() => {
+    previsualizarCierre(turnoId).then(setEfectivoEsperado);
+  }, [turnoId]);
+
+  useFocusEffect(recargarEsperado);
+
+  const contadoNum = parseMoneyInput(contado || '0');
+  const contadoIngresado = contado.trim().length > 0;
+  const diferencia = efectivoEsperado != null ? contadoNum - efectivoEsperado : 0;
+  const hayDescuadre = contadoIngresado && diferencia !== 0;
+
+  async function reconciliar() {
+    if (!contadoIngresado || diferencia === 0) return;
+    setReconciliando(true);
+    try {
+      // Documenta el descuadre como movimiento de caja para que el esperado
+      // pase a coincidir con lo contado y se pueda cerrar cuadrado.
+      await registrarMovimientoCaja({
+        turnoId,
+        tipo: diferencia > 0 ? 'ingreso' : 'egreso',
+        monto: Math.abs(diferencia),
+        motivo: diferencia > 0 ? 'Ajuste de cierre (sobrante)' : 'Ajuste de cierre (faltante)',
+      });
+      auditar(
+        'Ajuste de descuadre',
+        `${diferencia > 0 ? 'Sobrante' : 'Faltante'}: ${formatMoney(Math.abs(diferencia))}`,
+      );
+      recargarEsperado();
+    } finally {
+      setReconciliando(false);
+    }
+  }
 
   async function onSubmit() {
-    const turno = await cerrarTurno(turnoId, parseMoneyInput(contado || '0'));
+    if (hayDescuadre) return;
+    const turno = await cerrarTurno(turnoId, contadoNum);
     auditar(
       'Cierre de caja',
-      `Esperado: ${formatMoney(turno.efectivoEsperado ?? 0)} · Contado: ${formatMoney(
-        turno.efectivoContado ?? 0,
-      )} · Diferencia: ${formatMoney(turno.diferencia ?? 0)}`,
+      `Esperado: ${formatMoney(turno.efectivoEsperado ?? 0)} · Contado: ${formatMoney(turno.efectivoContado ?? 0)}`,
     );
     setResultado({ diferencia: turno.diferencia ?? 0 });
   }
@@ -285,11 +312,7 @@ function CierreTurnoForm({ turnoId, onDone, onCancel }: { turnoId: string; onDon
           Turno cerrado
         </Text>
         <Text variant="bodyLarge" style={styles.centerTitle}>
-          {resultado.diferencia === 0
-            ? 'Caja exacta'
-            : resultado.diferencia > 0
-              ? `Sobrante: ${formatMoney(resultado.diferencia)}`
-              : `Faltante: ${formatMoney(Math.abs(resultado.diferencia))}`}
+          Caja cuadrada ✓
         </Text>
         <Button icon="check" mode="contained" onPress={onDone}>
           Listo
@@ -314,11 +337,34 @@ function CierreTurnoForm({ turnoId, onDone, onCancel }: { turnoId: string; onDon
         keyboardType="decimal-pad"
         style={styles.input}
       />
+
+      {hayDescuadre && (
+        <View style={styles.descuadreBox}>
+          <Text variant="titleMedium" style={styles.egreso}>
+            {diferencia > 0
+              ? `Sobrante: ${formatMoney(diferencia)}`
+              : `Faltante: ${formatMoney(Math.abs(diferencia))}`}
+          </Text>
+          <Text variant="bodySmall" style={styles.centerTitle}>
+            No se puede cerrar con descuadre. Recontá el efectivo o registrá el ajuste para dejar la caja cuadrada.
+          </Text>
+          <Button
+            icon="scale-balance"
+            mode="contained-tonal"
+            onPress={reconciliar}
+            loading={reconciliando}
+            disabled={reconciliando}
+          >
+            Registrar ajuste de {diferencia > 0 ? 'sobrante' : 'faltante'}
+          </Button>
+        </View>
+      )}
+
       <View style={styles.formActions}>
         <Button icon="close" onPress={onCancel}>
           Cancelar
         </Button>
-        <Button icon="lock-check" mode="contained" onPress={onSubmit}>
+        <Button icon="lock-check" mode="contained" onPress={onSubmit} disabled={!contadoIngresado || hayDescuadre}>
           Confirmar cierre
         </Button>
       </View>
@@ -340,7 +386,8 @@ const styles = StyleSheet.create({
   sectionTitle: { marginTop: 8, marginBottom: 4 },
   movRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
   ingreso: { color: '#2E7D32' },
-  egreso: { color: '#B00020' },
+  egreso: { color: '#B00020', textAlign: 'center' },
+  descuadreBox: { gap: 8, marginBottom: 12, alignItems: 'center' },
   empty: { textAlign: 'center', marginTop: 24, opacity: 0.6 },
   modal: { backgroundColor: 'white', margin: 16, padding: 16, borderRadius: 12, maxHeight: '90%' },
   modalTitle: { marginBottom: 12, textAlign: 'center' },

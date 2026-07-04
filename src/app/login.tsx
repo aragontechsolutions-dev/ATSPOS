@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, Text, TextInput } from 'react-native-paper';
 
+import { CREDITO } from '@/lib/brand';
 import { useSessionStore } from '@/store/session';
 
 export default function LoginScreen() {
@@ -67,6 +68,10 @@ export default function LoginScreen() {
         <Button icon="login" mode="contained" onPress={onSubmit} loading={loading} disabled={loading} style={styles.button}>
           Ingresar
         </Button>
+
+        <Text variant="bodySmall" style={styles.credito}>
+          {CREDITO}
+        </Text>
       </View>
     </KeyboardAvoidingView>
   );
@@ -99,5 +104,10 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 8,
+  },
+  credito: {
+    textAlign: 'center',
+    marginTop: 32,
+    opacity: 0.6,
   },
 });
