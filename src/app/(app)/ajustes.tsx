@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Divider, List, Text, TextInput } from 'react-native-paper';
 
 import { crearUsuario, listarUsuarios, type UsuarioConRol } from '@/db/repositories/usuarios';
@@ -46,7 +46,7 @@ export default function AjustesScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <List.Section>
         <List.Subheader>Mi cuenta</List.Subheader>
         <List.Item title={usuario?.nombre} description={`@${usuario?.username} · ${usuario?.rol}`} />
@@ -71,14 +71,9 @@ export default function AjustesScreen() {
           <Divider />
           <List.Section>
             <List.Subheader>Usuarios</List.Subheader>
-            <FlatList
-              data={usuarios}
-              keyExtractor={(u) => u.id}
-              renderItem={({ item }) => (
-                <List.Item title={item.nombre} description={`@${item.username} · ${item.rol}`} />
-              )}
-              style={styles.list}
-            />
+            {usuarios.map((item) => (
+              <List.Item key={item.id} title={item.nombre} description={`@${item.username} · ${item.rol}`} />
+            ))}
 
             <View style={styles.form}>
               <TextInput label="Nombre" value={nombre} onChangeText={setNombre} mode="outlined" style={styles.input} />
@@ -119,14 +114,14 @@ export default function AjustesScreen() {
           </List.Section>
         </>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  content: { paddingBottom: 32 },
   logoutButton: { marginHorizontal: 16, marginTop: 8 },
-  list: { maxHeight: 200 },
   form: { padding: 16, gap: 4 },
   input: { marginBottom: 8 },
   rolRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
