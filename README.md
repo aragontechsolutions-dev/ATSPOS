@@ -38,6 +38,16 @@ expo-sqlite + Drizzle ORM, y React Native Paper.
 > instalada con datos sin cifrar, **desinstalá y reinstalá** (o borrá los datos de la app)
 > para que se cree una base nueva cifrada; una base plana previa no se puede abrir con clave.
 
+### Operación de mostrador
+
+- **Anulación de ventas** (con reposición de stock) y su exclusión de KPIs y del
+  efectivo esperado; historial de ventas con detalle, reimpresión y anulación.
+- **Ticket/recibo** imprimible o compartible (PDF) al cobrar y desde el detalle.
+- **Descuento** por venta en el cobro.
+- **Editar y eliminar productos** desde el detalle del producto.
+- **Auto-logout por inactividad** (5 min): cierra la sesión aunque la app esté en
+  segundo plano o se haya cerrado; al volver obliga a iniciar sesión de nuevo.
+
 Pendiente para etapas siguientes: sincronización multi-dispositivo.
 
 ## Usuario por defecto

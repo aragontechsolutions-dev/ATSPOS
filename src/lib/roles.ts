@@ -11,6 +11,7 @@ export type RolNombre = (typeof ROLES)[keyof typeof ROLES];
 // custom roles, so a fixed matrix avoids building admin UI nobody asked for.
 export const PERMISOS = {
   vender: [ROLES.ADMIN, ROLES.CAJERO, ROLES.SUPERVISOR],
+  anularVentas: [ROLES.ADMIN, ROLES.SUPERVISOR],
   gestionarProductos: [ROLES.ADMIN, ROLES.SUPERVISOR],
   ajustarStock: [ROLES.ADMIN, ROLES.SUPERVISOR],
   abrirCerrarCaja: [ROLES.ADMIN, ROLES.CAJERO, ROLES.SUPERVISOR],

@@ -33,7 +33,9 @@ export interface InventarioResumen {
   rotacion: number | null; // COGS del período / valor de inventario
 }
 
-const rango = (r: RangoFechas) => and(gte(ventas.fecha, r.desde), lt(ventas.fecha, r.hasta));
+// Voided sales never count towards KPIs, exports or expected cash.
+const rango = (r: RangoFechas) =>
+  and(gte(ventas.fecha, r.desde), lt(ventas.fecha, r.hasta), eq(ventas.anulada, false));
 
 export async function resumenVentas(r: RangoFechas): Promise<ResumenVentas> {
   const cab = db

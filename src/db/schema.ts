@@ -114,6 +114,9 @@ export const ventas = sqliteTable('ventas', {
   total: integer('total').notNull(),
   montoRecibido: integer('monto_recibido'),
   vuelto: integer('vuelto'),
+  anulada: integer('anulada', { mode: 'boolean' }).notNull().default(false),
+  anuladaFecha: integer('anulada_fecha', { mode: 'timestamp_ms' }),
+  anuladaMotivo: text('anulada_motivo'),
   ...syncColumns,
 });
 

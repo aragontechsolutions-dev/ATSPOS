@@ -80,6 +80,8 @@ export default function AppTabsLayout() {
       <Tabs.Screen name="producto-qr" options={{ href: null, title: 'Código QR' }} />
       <Tabs.Screen name="seguridad" options={{ href: null, title: 'Seguridad' }} />
       <Tabs.Screen name="auditoria" options={{ href: null, title: 'Auditoría' }} />
+      <Tabs.Screen name="ventas" options={{ href: null, title: 'Historial de ventas' }} />
+      <Tabs.Screen name="venta-detalle" options={{ href: null, title: 'Detalle de venta' }} />
     </Tabs>
   );
 }

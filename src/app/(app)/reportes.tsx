@@ -1,7 +1,7 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Card, Divider, SegmentedButtons, Snackbar, Text } from 'react-native-paper';
+import { Button, Card, Divider, List, SegmentedButtons, Snackbar, Text } from 'react-native-paper';
 
 import {
   inventarioParaExport,
@@ -21,6 +21,7 @@ import { formatMoney } from '@/lib/money';
 import { PERIODOS, rangoDePeriodo, type Periodo } from '@/lib/periodo';
 
 export default function ReportesScreen() {
+  const router = useRouter();
   const [periodo, setPeriodo] = useState<Periodo>('hoy');
   const [ventas, setVentas] = useState<ResumenVentas | null>(null);
   const [inventario, setInventario] = useState<InventarioResumen | null>(null);
@@ -92,6 +93,16 @@ export default function ReportesScreen() {
         onValueChange={(v) => setPeriodo(v as Periodo)}
         buttons={PERIODOS.map((p) => ({ value: p.value, label: p.label }))}
       />
+
+      <Card>
+        <List.Item
+          title="Historial de ventas"
+          description="Ver, reimprimir o anular ventas"
+          left={(props) => <List.Icon {...props} icon="receipt-text" />}
+          right={(props) => <List.Icon {...props} icon="chevron-right" />}
+          onPress={() => router.push('/ventas')}
+        />
+      </Card>
 
       <View style={styles.kpiGrid}>
         <KpiCard label="Ventas" value={formatMoney(ventas?.totalVentas ?? 0)} />

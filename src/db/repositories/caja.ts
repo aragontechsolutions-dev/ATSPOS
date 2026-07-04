@@ -58,7 +58,7 @@ async function calcularEfectivoEsperado(turno: Turno): Promise<number> {
   const ventasEfectivo = await db
     .select({ total: sql<number>`coalesce(sum(${ventas.total}), 0)` })
     .from(ventas)
-    .where(and(eq(ventas.turnoId, turno.id), eq(ventas.metodoPago, 'efectivo')))
+    .where(and(eq(ventas.turnoId, turno.id), eq(ventas.metodoPago, 'efectivo'), eq(ventas.anulada, false)))
     .get();
 
   const ingresos = await db

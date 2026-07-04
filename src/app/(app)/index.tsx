@@ -25,6 +25,7 @@ import {
 import { registrarVenta, type MetodoPago } from '@/db/repositories/ventas';
 import { formatMoney, parseMoneyInput } from '@/lib/money';
 import { parseContenidoQr } from '@/lib/qr';
+import { imprimirTicket, type TicketData } from '@/lib/ticket';
 import { useCartStore } from '@/store/cart';
 import { useSessionStore } from '@/store/session';
 
@@ -38,7 +39,7 @@ export default function VentaScreen() {
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  const { items, descuento, incrementar, decrementar, addProducto, subtotal, total } = useCartStore();
+  const { items, incrementar, decrementar, addProducto, subtotal, total } = useCartStore();
 
   const cargar = useCallback(() => {
     if (!usuario) return;
@@ -205,8 +206,6 @@ export default function VentaScreen() {
             turnoId={turno.id}
             usuarioId={usuario.id}
             subtotal={subtotal()}
-            descuento={descuento}
-            total={total()}
             onClose={() => setCheckoutVisible(false)}
           />
         </Modal>
@@ -223,19 +222,25 @@ interface CheckoutProps {
   turnoId: string;
   usuarioId: string;
   subtotal: number;
-  descuento: number;
-  total: number;
   onClose: () => void;
 }
 
-function CheckoutForm({ turnoId, usuarioId, subtotal, descuento, total, onClose }: CheckoutProps) {
+interface VentaConfirmadaUI {
+  vuelto: number | null;
+  ticket: TicketData;
+}
+
+function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) {
   const { items, clear } = useCartStore();
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('efectivo');
+  const [descuentoInput, setDescuentoInput] = useState('');
   const [montoRecibidoInput, setMontoRecibidoInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
-  const [confirmada, setConfirmada] = useState<{ vuelto: number | null } | null>(null);
+  const [confirmada, setConfirmada] = useState<VentaConfirmadaUI | null>(null);
 
+  const descuento = Math.min(parseMoneyInput(descuentoInput), subtotal);
+  const total = subtotal - descuento;
   const montoRecibido = metodoPago === 'efectivo' ? parseMoneyInput(montoRecibidoInput) : total;
   const vuelto = metodoPago === 'efectivo' ? montoRecibido - total : 0;
 
@@ -247,21 +252,38 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, descuento, total, onClose 
     setError(null);
     setProcesando(true);
     try {
+      const itemsVenta = items.map((i) => ({
+        productoId: i.productoId,
+        nombre: i.nombre,
+        cantidad: i.cantidad,
+        precioUnitario: i.precioUnitario,
+        costoUnitario: i.costoUnitario,
+      }));
       const resultado = await registrarVenta({
         turnoId,
         usuarioId,
         metodoPago,
         descuento,
         montoRecibido: metodoPago === 'efectivo' ? montoRecibido : undefined,
-        items: items.map((i) => ({
-          productoId: i.productoId,
-          nombre: i.nombre,
-          cantidad: i.cantidad,
-          precioUnitario: i.precioUnitario,
-          costoUnitario: i.costoUnitario,
-        })),
+        items: itemsVenta,
       });
-      setConfirmada({ vuelto: resultado.vuelto });
+      setConfirmada({
+        vuelto: resultado.vuelto,
+        ticket: {
+          fecha: new Date(),
+          items: itemsVenta.map((i) => ({
+            nombre: i.nombre,
+            cantidad: i.cantidad,
+            precioUnitario: i.precioUnitario,
+          })),
+          subtotal: resultado.subtotal,
+          descuento: resultado.descuento,
+          total: resultado.total,
+          metodoPago,
+          montoRecibido: metodoPago === 'efectivo' ? montoRecibido : null,
+          vuelto: resultado.vuelto,
+        },
+      });
       clear();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo registrar la venta');
@@ -281,6 +303,9 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, descuento, total, onClose 
             Vuelto: {formatMoney(confirmada.vuelto)}
           </Text>
         )}
+        <Button icon="printer" mode="outlined" onPress={() => imprimirTicket(confirmada.ticket)} style={styles.ticketBtn}>
+          Imprimir ticket
+        </Button>
         <Button icon="check" mode="contained" onPress={onClose}>
           Listo
         </Button>
@@ -293,6 +318,15 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, descuento, total, onClose 
       <Text variant="titleMedium" style={styles.modalTitle}>
         Cobrar {formatMoney(total)}
       </Text>
+
+      <TextInput
+        label="Descuento (opcional)"
+        value={descuentoInput}
+        onChangeText={setDescuentoInput}
+        mode="outlined"
+        keyboardType="decimal-pad"
+        style={styles.input}
+      />
 
       <RadioButton.Group onValueChange={(v) => setMetodoPago(v as MetodoPago)} value={metodoPago}>
         {(['efectivo', 'debito', 'credito', 'transferencia'] as MetodoPago[]).map((m) => (
@@ -362,4 +396,5 @@ const styles = StyleSheet.create({
   error: { color: '#B00020', marginTop: 8, textAlign: 'center' },
   confirmTitle: { textAlign: 'center', marginBottom: 12 },
   confirmVuelto: { textAlign: 'center', marginBottom: 16 },
+  ticketBtn: { marginBottom: 8 },
 });
