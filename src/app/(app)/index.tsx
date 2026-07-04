@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import {
   Button,
+  Dialog,
   Divider,
   IconButton,
   List,
@@ -38,8 +39,13 @@ export default function VentaScreen() {
   const [scannerVisible, setScannerVisible] = useState(false);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [editarCantidad, setEditarCantidad] = useState<{ productoId: string; nombre: string; valor: string } | null>(
+    null,
+  );
 
-  const { items, incrementar, decrementar, addProducto, subtotal, total } = useCartStore();
+  const { items, incrementar, decrementar, setCantidad, quitar, addProducto } = useCartStore();
+  // Total derivado de items para que se recalcule en cada cambio del carrito.
+  const totalCarrito = items.reduce((sum, i) => sum + i.precioUnitario * i.cantidad, 0);
 
   const cargar = useCallback(() => {
     if (!usuario) return;
@@ -105,7 +111,7 @@ export default function VentaScreen() {
           dense
           style={styles.search}
         />
-        <IconButton icon="barcode-scan" mode="contained" onPress={() => setScannerVisible(true)} />
+        <IconButton icon="qrcode-scan" mode="contained" onPress={() => setScannerVisible(true)} />
       </View>
 
       <Text variant="labelLarge" style={styles.sectionLabel}>
@@ -156,20 +162,26 @@ export default function VentaScreen() {
         style={styles.cartList}
         renderItem={({ item }) => (
           <View style={styles.cartRow}>
+            <IconButton icon="delete-outline" size={20} iconColor="#B3261E" onPress={() => quitar(item.productoId)} />
             <View style={styles.cartInfo}>
               <Text variant="bodyLarge">{item.nombre}</Text>
               <Text variant="bodySmall" style={styles.cartSub}>
-                {formatMoney(item.precioUnitario)} c/u
+                {formatMoney(item.precioUnitario)} c/u · {formatMoney(item.precioUnitario * item.cantidad)}
               </Text>
             </View>
             <View style={styles.qtyControls}>
-              <IconButton icon="minus" size={18} onPress={() => decrementar(item.productoId)} />
-              <Text variant="bodyLarge">{item.cantidad}</Text>
-              <IconButton icon="plus" size={18} onPress={() => incrementar(item.productoId)} />
+              <IconButton icon="minus" size={18} mode="outlined" onPress={() => decrementar(item.productoId)} />
+              <Text
+                variant="titleMedium"
+                style={styles.qtyValue}
+                onPress={() =>
+                  setEditarCantidad({ productoId: item.productoId, nombre: item.nombre, valor: String(item.cantidad) })
+                }
+              >
+                {item.cantidad}
+              </Text>
+              <IconButton icon="plus" size={18} mode="outlined" onPress={() => incrementar(item.productoId)} />
             </View>
-            <Text variant="bodyLarge" style={styles.cartLineTotal}>
-              {formatMoney(item.precioUnitario * item.cantidad)}
-            </Text>
           </View>
         )}
         ListEmptyComponent={
@@ -182,7 +194,7 @@ export default function VentaScreen() {
       <View style={styles.footer}>
         <View style={styles.totalRow}>
           <Text variant="titleMedium">Total</Text>
-          <Text variant="titleLarge">{formatMoney(total())}</Text>
+          <Text variant="headlineSmall">{formatMoney(totalCarrito)}</Text>
         </View>
         <Button
           icon="cash-multiple"
@@ -205,10 +217,44 @@ export default function VentaScreen() {
           <CheckoutForm
             turnoId={turno.id}
             usuarioId={usuario.id}
-            subtotal={subtotal()}
+            subtotal={totalCarrito}
             onClose={() => setCheckoutVisible(false)}
           />
         </Modal>
+
+        <Dialog visible={!!editarCantidad} onDismiss={() => setEditarCantidad(null)}>
+          <Dialog.Title>Cantidad</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium" style={styles.dialogNombre}>
+              {editarCantidad?.nombre}
+            </Text>
+            <TextInput
+              label="Unidades"
+              value={editarCantidad?.valor ?? ''}
+              onChangeText={(t) =>
+                setEditarCantidad((prev) => (prev ? { ...prev, valor: t.replace(/[^0-9]/g, '') } : prev))
+              }
+              mode="outlined"
+              keyboardType="number-pad"
+              autoFocus
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setEditarCantidad(null)}>Cancelar</Button>
+            <Button
+              mode="contained"
+              onPress={() => {
+                if (editarCantidad) {
+                  const n = Number.parseInt(editarCantidad.valor, 10);
+                  if (n > 0) setCantidad(editarCantidad.productoId, n);
+                }
+                setEditarCantidad(null);
+              }}
+            >
+              Aceptar
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
 
       <Snackbar visible={!!aviso} onDismiss={() => setAviso(null)} duration={1800}>
@@ -243,6 +289,7 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) 
   const total = subtotal - descuento;
   const montoRecibido = metodoPago === 'efectivo' ? parseMoneyInput(montoRecibidoInput) : total;
   const vuelto = metodoPago === 'efectivo' ? montoRecibido - total : 0;
+  const faltaEfectivo = metodoPago === 'efectivo' && montoRecibido < total;
 
   async function confirmar() {
     if (metodoPago === 'efectivo' && montoRecibido < total) {
@@ -344,11 +391,16 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) 
             keyboardType="decimal-pad"
             style={styles.input}
           />
-          {montoRecibidoInput.length > 0 && (
-            <Text variant="bodyMedium" style={styles.vuelto}>
-              Vuelto: {formatMoney(Math.max(vuelto, 0))}
-            </Text>
-          )}
+          {montoRecibidoInput.length > 0 &&
+            (faltaEfectivo ? (
+              <Text variant="bodyMedium" style={styles.falta}>
+                Falta: {formatMoney(total - montoRecibido)}
+              </Text>
+            ) : (
+              <Text variant="titleMedium" style={styles.vuelto}>
+                Vuelto: {formatMoney(vuelto)}
+              </Text>
+            ))}
         </>
       )}
 
@@ -362,7 +414,13 @@ function CheckoutForm({ turnoId, usuarioId, subtotal, onClose }: CheckoutProps) 
         <Button onPress={onClose} disabled={procesando}>
           Cancelar
         </Button>
-        <Button icon="check" mode="contained" onPress={confirmar} loading={procesando} disabled={procesando}>
+        <Button
+          icon="check"
+          mode="contained"
+          onPress={confirmar}
+          loading={procesando}
+          disabled={procesando || faltaEfectivo}
+        >
           Confirmar
         </Button>
       </View>
@@ -384,14 +442,16 @@ const styles = StyleSheet.create({
   cartInfo: { flex: 1 },
   cartSub: { opacity: 0.7 },
   qtyControls: { flexDirection: 'row', alignItems: 'center' },
-  cartLineTotal: { width: 90, textAlign: 'right' },
+  qtyValue: { minWidth: 44, textAlign: 'center', textDecorationLine: 'underline' },
   empty: { textAlign: 'center', marginTop: 40, opacity: 0.6 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#ccc', paddingTop: 8 },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   modal: { backgroundColor: 'white', margin: 16, padding: 16, borderRadius: 12, maxHeight: '90%' },
   modalTitle: { marginBottom: 8, textAlign: 'center' },
   input: { marginTop: 8 },
-  vuelto: { textAlign: 'center', marginTop: 8 },
+  vuelto: { textAlign: 'center', marginTop: 8, color: '#0B6E4F' },
+  falta: { textAlign: 'center', marginTop: 8, color: '#B3261E' },
+  dialogNombre: { marginBottom: 12 },
   formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
   error: { color: '#B00020', marginTop: 8, textAlign: 'center' },
   confirmTitle: { textAlign: 'center', marginBottom: 12 },

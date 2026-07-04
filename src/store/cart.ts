@@ -17,6 +17,7 @@ interface CartState {
   addProducto: (producto: Producto) => void;
   incrementar: (productoId: string) => void;
   decrementar: (productoId: string) => void;
+  setCantidad: (productoId: string, cantidad: number) => void;
   quitar: (productoId: string) => void;
   setDescuento: (descuento: number) => void;
   clear: () => void;
@@ -68,6 +69,15 @@ export const useCartStore = create<CartState>((set, get) => ({
       items: state.items
         .map((i) => (i.productoId === productoId ? { ...i, cantidad: i.cantidad - 1 } : i))
         .filter((i) => i.cantidad > 0),
+    })),
+
+  setCantidad: (productoId, cantidad) =>
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.productoId === productoId
+          ? { ...i, cantidad: Math.max(1, Math.min(cantidad, i.stockDisponible)) }
+          : i,
+      ),
     })),
 
   quitar: (productoId) =>

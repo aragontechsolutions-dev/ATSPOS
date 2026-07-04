@@ -159,7 +159,7 @@ function NuevoProductoForm({
         onChangeText={onCodigoBarrasChange}
         mode="outlined"
         style={styles.input}
-        right={<TextInput.Icon icon="barcode-scan" onPress={onScan} />}
+        right={<TextInput.Icon icon="qrcode-scan" onPress={onScan} />}
       />
       <View style={styles.priceRow}>
         <TextInput
