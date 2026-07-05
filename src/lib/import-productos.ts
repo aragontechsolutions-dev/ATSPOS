@@ -19,7 +19,8 @@ export interface FilaImport {
 export interface ResultadoLectura {
   filas: FilaImport[];
   errores: string[];
-  totalFilas: number;
+  filasLeidas: number;
+  columnas: string[];
 }
 
 const PLANTILLA_HEADERS = [
@@ -34,21 +35,33 @@ const PLANTILLA_HEADERS = [
 ];
 
 const PLANTILLA_EJEMPLOS = [
-  ['Coca Cola 500ml', '800', '500', 'Bebidas', 'unidad', '24', '6', '7790895000123'],
-  ['Queso cremoso', '3500', '2500', 'Fiambres', 'kg', '5', '1', ''],
-  ['Fideos 500g', '900', '650', 'Almacén', 'unidad', '30', '10', ''],
+  ['Coca Cola 500ml', 800, 500, 'Bebidas', 'unidad', 24, 6, '7790895000123'],
+  ['Queso cremoso', 3500, 2500, 'Fiambres', 'kg', 5, 1, ''],
+  ['Fideos 500g', 900, 650, 'Almacén', 'unidad', 30, 10, ''],
 ];
 
-/** Genera una plantilla CSV de ejemplo y abre el menú para guardarla/compartirla. */
+/**
+ * Genera una plantilla Excel (.xlsx) de ejemplo y abre el menú para
+ * guardarla/compartirla. Se usa .xlsx en vez de CSV porque Excel/Sheets lo
+ * abren con columnas correctas sin importar la configuración regional
+ * (evita el problema del separador coma/punto y coma).
+ */
 export async function descargarPlantilla(): Promise<boolean> {
-  const csv = [PLANTILLA_HEADERS.join(','), ...PLANTILLA_EJEMPLOS.map((f) => f.join(','))].join('\n');
-  const file = new File(Paths.cache, 'plantilla-productos-atspos.csv');
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([PLANTILLA_HEADERS, ...PLANTILLA_EJEMPLOS]);
+  XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+  const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+
+  const file = new File(Paths.document, 'plantilla-productos-atspos.xlsx');
   if (file.exists) file.delete();
   file.create();
-  file.write(`﻿${csv}`); // BOM para que Excel abra los acentos bien
+  file.write(base64, { encoding: 'base64' });
 
   if (!(await Sharing.isAvailableAsync())) return false;
-  await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'Plantilla de productos' });
+  await Sharing.shareAsync(file.uri, {
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    dialogTitle: 'Plantilla de productos',
+  });
   return true;
 }
 
@@ -64,9 +77,9 @@ function stripAccents(s: string): string {
 
 const collapse = (s: string) => stripAccents(String(s).toLowerCase()).replace(/[^a-z0-9]/g, '');
 
-const ALIAS: Record<keyof Omit<FilaImport, never>, string[]> = {
+const ALIAS: Record<keyof FilaImport, string[]> = {
   nombre: ['nombre', 'producto', 'descripcion', 'detalle'],
-  precioVenta: ['precioventa', 'precio', 'preciodeventa', 'venta', 'pventa'],
+  precioVenta: ['precioventa', 'precio', 'preciodeventa', 'venta', 'pventa', 'preciounitario'],
   precioCosto: ['preciocosto', 'costo', 'preciodecosto', 'pcosto'],
   categoria: ['categoria', 'rubro'],
   unidadMedida: ['unidad', 'unidaddemedida', 'medida', 'um'],
@@ -95,29 +108,48 @@ function parsePrecio(v: string): number {
   return v ? parseMoneyInput(v) : 0;
 }
 
-/** Lee un archivo .csv o .xlsx elegido por el usuario y lo convierte en filas validadas. */
+/** Lee un archivo .xlsx o .csv elegido por el usuario y lo convierte en filas validadas. */
 export async function leerArchivoProductos(): Promise<ResultadoLectura | null> {
   const picked = await File.pickFileAsync();
   if (picked.canceled) return null;
   const archivo = picked.result;
 
-  const esCsv = (archivo.name ?? '').toLowerCase().endsWith('.csv');
-  const wb = esCsv
-    ? XLSX.read(await archivo.text(), { type: 'string' })
-    : XLSX.read(await archivo.base64(), { type: 'base64' });
+  // La lectura por base64 sirve para xlsx (binario) y csv (texto); SheetJS
+  // detecta el formato y el separador. Si no da filas, probamos como texto.
+  let rows: Record<string, unknown>[] = [];
+  try {
+    const base64 = await archivo.base64();
+    if (base64) {
+      const wb = XLSX.read(base64, { type: 'base64' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      if (sheet) rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+    }
+  } catch {
+    // se intenta el fallback de texto abajo
+  }
 
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+  if (rows.length === 0) {
+    try {
+      const texto = await archivo.text();
+      if (texto) {
+        const wb = XLSX.read(texto, { type: 'string' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        if (sheet) rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+      }
+    } catch {
+      // queda rows vacío
+    }
+  }
 
+  const columnas = rows.length > 0 ? Object.keys(rows[0]).map((k) => k.replace(/^﻿/, '')) : [];
   const filas: FilaImport[] = [];
   const errores: string[] = [];
 
   rows.forEach((row, i) => {
-    const numeroFila = i + 2; // +1 header, +1 base-1
+    const numeroFila = i + 2;
     const nombre = buscarValor(row, ALIAS.nombre);
     const precioVentaRaw = buscarValor(row, ALIAS.precioVenta);
-
-    if (!nombre && !precioVentaRaw) return; // fila vacía, se ignora
+    if (!nombre && !precioVentaRaw) return; // fila vacía
 
     if (!nombre) {
       errores.push(`Fila ${numeroFila}: falta el nombre.`);
@@ -142,5 +174,5 @@ export async function leerArchivoProductos(): Promise<ResultadoLectura | null> {
     });
   });
 
-  return { filas, errores, totalFilas: rows.length };
+  return { filas, errores, filasLeidas: rows.length, columnas };
 }

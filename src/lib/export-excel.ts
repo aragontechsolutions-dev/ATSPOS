@@ -24,10 +24,16 @@ function fechaLegible(d: Date): string {
  */
 export async function compartirWorkbook(wb: XLSX.WorkBook, filename: string): Promise<boolean> {
   const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-  const file = new File(Paths.cache, filename);
+  // documentDirectory se comparte de forma más confiable con algunas apps
+  // (WhatsApp) que la cache.
+  const file = new File(Paths.document, filename);
   if (file.exists) file.delete();
   file.create();
   file.write(base64, { encoding: 'base64' });
+
+  if (file.size <= 0) {
+    throw new Error('El archivo quedó vacío al generarse');
+  }
 
   if (!(await Sharing.isAvailableAsync())) return false;
   await Sharing.shareAsync(file.uri, {

@@ -70,7 +70,7 @@ export default function ImportarProductosScreen() {
       <Card style={styles.card}>
         <List.Item
           title="Paso 1 — Descargar la planilla"
-          description="Se guarda un archivo de ejemplo con las columnas ya puestas"
+          description="Se guarda un archivo Excel de ejemplo con las columnas ya puestas"
           left={(props) => <List.Icon {...props} icon="numeric-1-circle" />}
         />
         <View style={styles.pad}>
@@ -117,6 +117,14 @@ export default function ImportarProductosScreen() {
             <Text variant="bodyLarge">
               {lectura.filas.length} producto(s) listos para importar.
             </Text>
+            {lectura.filas.length === 0 && (
+              <Text variant="bodySmall" style={styles.diag}>
+                Se leyeron {lectura.filasLeidas} fila(s) del archivo.
+                {lectura.columnas.length > 0
+                  ? ` Columnas detectadas: ${lectura.columnas.join(', ')}. Revisá que existan "nombre" y "precio_venta".`
+                  : ' No se detectaron columnas. Usá la planilla del Paso 1 y guardala como Excel (.xlsx).'}
+              </Text>
+            )}
             {lectura.errores.length > 0 && (
               <>
                 <Text variant="bodyMedium" style={styles.errorTitle}>
@@ -183,6 +191,7 @@ const styles = StyleSheet.create({
   pad: { paddingHorizontal: 16, paddingBottom: 16 },
   ayuda: { opacity: 0.8 },
   bold: { fontWeight: 'bold' },
+  diag: { marginTop: 8, opacity: 0.8 },
   errorTitle: { color: '#B3261E', marginTop: 12, marginBottom: 4 },
   errorItem: { color: '#B3261E' },
   okCard: { backgroundColor: '#DCF4E9' },
