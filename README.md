@@ -108,18 +108,58 @@ build instalado sin necesidad de recompilar en cada cambio de JS.
 Cuando cambies algo nativo (por ejemplo, si más adelante activás SQLCipher), volvé a correr
 `npx expo prebuild --platform android` y recompilá.
 
-## Generar un APK instalable
+## Generar un APK instalable (para WhatsApp / sideload)
 
-Con Android Studio ya podés generar un APK de `android/` (Build > Build Bundle(s) / APK(s) >
-Build APK(s)), o localmente con Gradle:
+> **Clave:** firmá siempre el APK con **tu propia clave (keystore)** y **guardá ese
+> archivo para siempre**. Android sólo permite instalar una actualización encima de otra
+> si ambas están firmadas con la misma clave. Si perdés el keystore, para actualizar vas a
+> tener que **desinstalar** la app — y eso **borra la base de datos** del negocio. Como la
+> base está cifrada con SQLCipher, no hay forma de recuperarla sin backup.
+
+### 1. Generar el keystore (una sola vez)
 
 ```bash
-cd android
-./gradlew assembleRelease
+keytool -genkeypair -v -keystore atspos-release.keystore \
+  -alias atspos -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-El APK queda en `android/app/build/outputs/apk/release/`. Instalalo en el Samsung A14 con
-`adb install` o transfiriéndolo directamente al teléfono (habilitar "orígenes desconocidos").
+Te pide una contraseña y algunos datos. Guardá el archivo `atspos-release.keystore` y la
+contraseña en un lugar seguro (y en el backup). Esta es la identidad de la app para siempre.
+
+### 2. Regenerar la carpeta nativa y compilar
+
+```bash
+npm install
+npx expo prebuild --platform android   # regenera android/ (SQLCipher, íconos, permisos)
+```
+
+### 3. Firmar y construir el APK con Android Studio (camino recomendado)
+
+Abrí la carpeta `android/` en Android Studio y usá el asistente:
+
+**Build → Generate Signed Bundle / APK… → APK → elegí `atspos-release.keystore` (alias
+`atspos`) → Build type: `release` → Finish.**
+
+El asistente firma con tu keystore sin tocar la configuración de Gradle (útil porque
+`npx expo prebuild` regenera `android/` y borraría cambios manuales). El APK queda en
+`android/app/build/outputs/apk/release/app-release.apk`.
+
+### 4. Enviar e instalar
+
+Pasá ese `.apk` al teléfono (WhatsApp, cable, Drive). En el Samsung A14, al abrirlo, aceptá
+**"Instalar apps de orígenes desconocidos"** para esa app y confirmá la instalación.
+
+### Publicar una actualización más adelante
+
+1. Subí el número en `app.json`: `expo.version` (ej. `1.0.1`) y `expo.android.versionCode`
+   (ej. `2`; **siempre mayor** al anterior).
+2. Repetí los pasos 2 y 3 **con el mismo keystore**.
+3. Instalá el nuevo APK encima del anterior: los datos se conservan.
+
+> Alternativa por línea de comandos: `cd android && ./gradlew assembleRelease`. Sin
+> configurar la firma, Gradle usa la **clave de debug** (sirve para probar, pero **no**
+> para actualizar sin desinstalar). Por eso, para la app "de verdad" usá el asistente con
+> tu keystore.
 
 ## Base de datos y migraciones
 

@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.aragontechsolutions.atspos",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0B6E4F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
