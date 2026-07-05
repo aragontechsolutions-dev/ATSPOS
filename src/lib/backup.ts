@@ -114,15 +114,18 @@ function dumpTablas(): Dump {
 
 const nombreBackup = () => `atspos-backup-${new Date().toISOString().slice(0, 10)}.atsbak`;
 
-async function construirBackupJson(password: string): Promise<string> {
-  const dump = dumpTablas();
+/**
+ * Cifra un objeto arbitrario en un Envelope (formato 2, partes separadas).
+ * Reutilizado por el backup real y por el autotest de diagnóstico.
+ */
+async function cifrarObjeto(obj: unknown, password: string): Promise<Envelope> {
   const salt = randomHex(16);
   const key = await deriveKey(password, salt, KDF_ITERACIONES);
 
-  const plaintext = utf8ToBytes(JSON.stringify(dump));
+  const plaintext = utf8ToBytes(JSON.stringify(obj));
   const sealed = await Crypto.aesEncryptAsync(plaintext, key);
 
-  const envelope: Envelope = {
+  return {
     app: 'ATSPOS',
     formato: FORMATO,
     fecha: new Date().toISOString(),
@@ -132,6 +135,25 @@ async function construirBackupJson(password: string): Promise<string> {
     ciphertext: (await sealed.ciphertext({ includeTag: false, encoding: 'base64' })) as string,
     tag: (await sealed.tag('base64')) as string,
   };
+}
+
+/** Descifra un Envelope (formato 1 o 2) devolviendo el objeto original. */
+async function descifrarEnvelope(envelope: Envelope, password: string): Promise<unknown> {
+  const key = await deriveKey(password, envelope.salt, envelope.iteraciones);
+  const sealed =
+    envelope.iv && envelope.ciphertext && envelope.tag
+      ? Crypto.AESSealedData.fromParts(envelope.iv, envelope.ciphertext, envelope.tag)
+      : Crypto.AESSealedData.fromCombined(envelope.contenido as string, {
+          ivLength: envelope.ivLength ?? 12,
+          tagLength: (envelope.tagLength ?? 16) as Crypto.GCMTagByteLength,
+        });
+  const bytes = (await Crypto.aesDecryptAsync(sealed, key)) as Uint8Array;
+  return JSON.parse(bytesToUtf8(bytes));
+}
+
+async function construirBackupJson(password: string): Promise<string> {
+  const dump = dumpTablas();
+  const envelope = await cifrarObjeto(dump, password);
   return JSON.stringify(envelope);
 }
 
@@ -212,6 +234,17 @@ function reemplazarDatos(dump: Dump): void {
 export interface ResultadoRestore {
   ok: boolean;
   motivo?: 'cancelado' | 'password' | 'formato' | 'error';
+  /** Mensaje técnico real de la etapa que falló (para diagnóstico en pantalla). */
+  detalle?: string;
+}
+
+function mensajeError(e: unknown): string {
+  if (e instanceof Error) return `${e.name}: ${e.message}`;
+  try {
+    return String(e);
+  } catch {
+    return 'error desconocido';
+  }
 }
 
 /** Lets the user pick a .atsbak file, decrypts it and replaces all data. */
@@ -222,8 +255,8 @@ export async function restaurarBackup(password: string): Promise<ResultadoRestor
     const picked = await File.pickFileAsync();
     if (picked.canceled) return { ok: false, motivo: 'cancelado' };
     texto = await picked.result.text();
-  } catch {
-    return { ok: false, motivo: 'cancelado' };
+  } catch (e) {
+    return { ok: false, motivo: 'cancelado', detalle: `lectura archivo: ${mensajeError(e)}` };
   }
 
   let envelope: Envelope;
@@ -231,33 +264,90 @@ export async function restaurarBackup(password: string): Promise<ResultadoRestor
     envelope = JSON.parse(texto);
     const tienePartes = envelope.iv && envelope.ciphertext && envelope.tag;
     if (envelope.app !== 'ATSPOS' || !envelope.salt || !(tienePartes || envelope.contenido)) {
-      return { ok: false, motivo: 'formato' };
+      return {
+        ok: false,
+        motivo: 'formato',
+        detalle: `app=${String(envelope.app)} salt=${envelope.salt ? 'sí' : 'no'} partes=${
+          tienePartes ? 'sí' : 'no'
+        } contenido=${envelope.contenido ? 'sí' : 'no'} len=${texto.length}`,
+      };
     }
-  } catch {
-    return { ok: false, motivo: 'formato' };
+  } catch (e) {
+    return { ok: false, motivo: 'formato', detalle: `JSON inválido (len=${texto.length}): ${mensajeError(e)}` };
   }
 
   let dump: Dump;
   try {
-    const key = await deriveKey(password, envelope.salt, envelope.iteraciones);
-    const sealed =
-      envelope.iv && envelope.ciphertext && envelope.tag
-        ? Crypto.AESSealedData.fromParts(envelope.iv, envelope.ciphertext, envelope.tag)
-        : Crypto.AESSealedData.fromCombined(envelope.contenido as string, {
-            ivLength: envelope.ivLength ?? 12,
-            tagLength: (envelope.tagLength ?? 16) as Crypto.GCMTagByteLength,
-          });
-    const bytes = (await Crypto.aesDecryptAsync(sealed, key)) as Uint8Array;
-    dump = JSON.parse(bytesToUtf8(bytes));
-  } catch {
+    dump = (await descifrarEnvelope(envelope, password)) as Dump;
+  } catch (e) {
     // GCM tag mismatch → wrong password (or corrupted file).
-    return { ok: false, motivo: 'password' };
+    return { ok: false, motivo: 'password', detalle: `descifrado: ${mensajeError(e)}` };
   }
 
   try {
     reemplazarDatos(dump);
-  } catch {
-    return { ok: false, motivo: 'error' };
+  } catch (e) {
+    return { ok: false, motivo: 'error', detalle: `reemplazo datos: ${mensajeError(e)}` };
   }
   return { ok: true };
+}
+
+export interface ResultadoAutotest {
+  ok: boolean;
+  /** Etapa donde se detuvo si falló. */
+  etapa?: 'cifrar' | 'serializar' | 'descifrar' | 'comparar';
+  detalle: string;
+}
+
+/**
+ * Diagnóstico en memoria (sin archivos): cifra un objeto conocido con caracteres
+ * acentuados/ñ, lo serializa a JSON como el backup real, lo vuelve a parsear y
+ * descifrar, y compara. Aísla si el problema es la criptografía/serialización o
+ * la lectura del archivo en disco.
+ */
+export async function autotestBackup(): Promise<ResultadoAutotest> {
+  const password = 'diagnostico-1234';
+  const muestra = {
+    texto: 'Ñoño acentúa: café, piña, ¿€ 1.234,50? — José',
+    numero: 123456,
+    decimal: 12.5,
+    nulo: null,
+    lista: [1, 'dos', { tres: '3' }],
+  };
+
+  let envelope: Envelope;
+  try {
+    envelope = await cifrarObjeto(muestra, password);
+  } catch (e) {
+    return { ok: false, etapa: 'cifrar', detalle: mensajeError(e) };
+  }
+
+  let texto: string;
+  let reparsed: Envelope;
+  try {
+    // Igual que el backup real: serializar el envelope y volver a parsearlo.
+    texto = JSON.stringify(envelope);
+    reparsed = JSON.parse(texto);
+  } catch (e) {
+    return { ok: false, etapa: 'serializar', detalle: mensajeError(e) };
+  }
+
+  let salida: unknown;
+  try {
+    salida = await descifrarEnvelope(reparsed, password);
+  } catch (e) {
+    return {
+      ok: false,
+      etapa: 'descifrar',
+      detalle: `${mensajeError(e)} · iv=${reparsed.iv?.length} ct=${reparsed.ciphertext?.length} tag=${reparsed.tag?.length}`,
+    };
+  }
+
+  const esperado = JSON.stringify(muestra);
+  const obtenido = JSON.stringify(salida);
+  if (esperado !== obtenido) {
+    return { ok: false, etapa: 'comparar', detalle: `esperado≠obtenido\nesp=${esperado}\nobt=${obtenido}` };
+  }
+
+  return { ok: true, detalle: `Cifrado y descifrado correctos (formato ${envelope.formato}, ${envelope.iteraciones} iter).` };
 }

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Dialog, HelperText, List, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
 
-import { exportarBackup, guardarBackupEnCarpeta, restaurarBackup } from '@/lib/backup';
+import { autotestBackup, exportarBackup, guardarBackupEnCarpeta, restaurarBackup } from '@/lib/backup';
 import { auditar } from '@/lib/audit';
 import { useSessionStore } from '@/store/session';
 
@@ -17,13 +17,33 @@ export default function SeguridadScreen() {
   const [password2, setPassword2] = useState('');
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detalle, setDetalle] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [diagnostico, setDiagnostico] = useState<string | null>(null);
 
   function abrir(modo: Modo) {
     setPassword('');
     setPassword2('');
     setError(null);
+    setDetalle(null);
     setDialogo(modo);
+  }
+
+  async function onDiagnostico() {
+    setProcesando(true);
+    setDiagnostico('Ejecutando…');
+    try {
+      const res = await autotestBackup();
+      setDiagnostico(
+        res.ok
+          ? `✅ OK — ${res.detalle}`
+          : `❌ Falló en la etapa "${res.etapa}":\n${res.detalle}`,
+      );
+    } catch (e) {
+      setDiagnostico(`❌ Error inesperado: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setProcesando(false);
+    }
   }
 
   async function onExportar() {
@@ -82,6 +102,7 @@ export default function SeguridadScreen() {
       return;
     }
     setError(null);
+    setDetalle(null);
     setProcesando(true);
     try {
       const res = await restaurarBackup(password);
@@ -92,7 +113,7 @@ export default function SeguridadScreen() {
         setTimeout(() => logout(), 1500);
         return;
       }
-      if (res.motivo === 'cancelado') {
+      if (res.motivo === 'cancelado' && !res.detalle) {
         setDialogo(null);
         return;
       }
@@ -101,8 +122,11 @@ export default function SeguridadScreen() {
           ? 'Contraseña incorrecta o archivo dañado'
           : res.motivo === 'formato'
             ? 'El archivo no es un backup válido de ATSPOS'
-            : 'No se pudo restaurar el backup',
+            : res.motivo === 'cancelado'
+              ? 'No se pudo leer el archivo'
+              : 'No se pudo restaurar el backup',
       );
+      setDetalle(res.detalle ?? null);
     } finally {
       setProcesando(false);
     }
@@ -145,6 +169,31 @@ export default function SeguridadScreen() {
           onPress={() => router.push('/auditoria')}
         />
       </Card>
+
+      <Card style={styles.card}>
+        <List.Item
+          title="Probar cifrado (diagnóstico)"
+          description="Verifica el cifrado/descifrado en memoria, sin archivos"
+          left={(props) => <List.Icon {...props} icon="bug-check" />}
+          onPress={onDiagnostico}
+        />
+      </Card>
+
+      {diagnostico && (
+        <Card style={styles.card}>
+          <Card.Content>
+            <Text variant="titleSmall" style={styles.diagTitulo}>
+              Resultado del diagnóstico
+            </Text>
+            <Text variant="bodySmall" style={styles.diagTexto} selectable>
+              {diagnostico}
+            </Text>
+            <Button compact onPress={() => setDiagnostico(null)}>
+              Cerrar
+            </Button>
+          </Card.Content>
+        </Card>
+      )}
 
       <Portal>
         <Dialog visible={dialogo === 'exportar'} onDismiss={() => !procesando && setDialogo(null)}>
@@ -198,6 +247,11 @@ export default function SeguridadScreen() {
               style={styles.input}
             />
             {error && <HelperText type="error">{error}</HelperText>}
+            {detalle && (
+              <Text variant="bodySmall" style={styles.diagTexto} selectable>
+                Detalle técnico: {detalle}
+              </Text>
+            )}
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setDialogo(null)} disabled={procesando}>
@@ -225,4 +279,6 @@ const styles = StyleSheet.create({
   warn: { marginBottom: 12 },
   tip: { opacity: 0.7, marginBottom: 8 },
   exportActions: { flexWrap: 'wrap' },
+  diagTitulo: { marginBottom: 4 },
+  diagTexto: { marginTop: 6, opacity: 0.85, fontFamily: 'monospace' },
 });
