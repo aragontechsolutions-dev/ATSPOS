@@ -129,13 +129,20 @@ export async function exportarBackup(password: string): Promise<boolean> {
   };
 
   const nombre = `atspos-backup-${new Date().toISOString().slice(0, 10)}.atsbak`;
-  const file = new File(Paths.cache, nombre);
+  const file = new File(Paths.document, nombre);
   if (file.exists) file.delete();
   file.create();
   file.write(JSON.stringify(envelope));
 
+  if (file.size <= 0) throw new Error('El backup quedó vacío al generarse');
+
   if (!(await Sharing.isAvailableAsync())) return false;
-  await Sharing.shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: 'Guardar backup de ATSPOS' });
+  // octet-stream: WhatsApp/apps lo adjuntan como archivo genérico sin intentar
+  // previsualizarlo como texto (lo que rompía la pantalla de comentario).
+  await Sharing.shareAsync(file.uri, {
+    mimeType: 'application/octet-stream',
+    dialogTitle: 'Guardar backup de ATSPOS',
+  });
   return true;
 }
 
@@ -174,7 +181,8 @@ export interface ResultadoRestore {
 export async function restaurarBackup(password: string): Promise<ResultadoRestore> {
   let texto: string;
   try {
-    const picked = await File.pickFileAsync({ mimeTypes: ['application/json'] });
+    // Sin filtro de tipo: el .atsbak suele reportarse como octet-stream/desconocido.
+    const picked = await File.pickFileAsync();
     if (picked.canceled) return { ok: false, motivo: 'cancelado' };
     texto = await picked.result.text();
   } catch {
