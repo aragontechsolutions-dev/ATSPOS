@@ -11,10 +11,12 @@ const TABLAS_ORDEN = [
   'categorias',
   'proveedores',
   'usuarios',
+  'clientes',
   'productos',
   'turnos',
   'ventas',
   'detalle_venta',
+  'movimientos_cliente',
   'compras',
   'detalle_compra',
   'movimientos_stock',
@@ -333,66 +335,4 @@ export async function restaurarBackup(password: string): Promise<ResultadoRestor
     return { ok: false, motivo: 'error', detalle: `reemplazo datos: ${mensajeError(e)}` };
   }
   return { ok: true };
-}
-
-export interface ResultadoAutotest {
-  ok: boolean;
-  /** Etapa donde se detuvo si falló. */
-  etapa?: 'cifrar' | 'serializar' | 'descifrar' | 'comparar';
-  detalle: string;
-}
-
-/**
- * Diagnóstico en memoria (sin archivos): cifra un objeto conocido con caracteres
- * acentuados/ñ, lo serializa a JSON como el backup real, lo vuelve a parsear y
- * descifrar, y compara. Aísla si el problema es la criptografía/serialización o
- * la lectura del archivo en disco.
- */
-export async function autotestBackup(): Promise<ResultadoAutotest> {
-  const password = 'diagnostico-1234';
-  const muestra = {
-    texto: 'Ñoño acentúa: café, piña, ¿€ 1.234,50? — José',
-    numero: 123456,
-    decimal: 12.5,
-    nulo: null,
-    lista: [1, 'dos', { tres: '3' }],
-  };
-
-  let envelope: Envelope;
-  try {
-    envelope = await cifrarObjeto(muestra, password);
-  } catch (e) {
-    return { ok: false, etapa: 'cifrar', detalle: mensajeError(e) };
-  }
-
-  let texto: string;
-  let reparsed: Envelope;
-  try {
-    // Igual que el backup real: serializar el envelope y volver a parsearlo.
-    texto = JSON.stringify(envelope);
-    reparsed = JSON.parse(texto);
-  } catch (e) {
-    return { ok: false, etapa: 'serializar', detalle: mensajeError(e) };
-  }
-
-  let salida: unknown;
-  try {
-    salida = await descifrarEnvelope(reparsed, password);
-  } catch (e) {
-    return {
-      ok: false,
-      etapa: 'descifrar',
-      detalle: `${mensajeError(e)} · combined(${typeof reparsed.combined})=${
-        typeof reparsed.combined === 'string' ? reparsed.combined.length : JSON.stringify(reparsed.combined)?.slice(0, 40)
-      }`,
-    };
-  }
-
-  const esperado = JSON.stringify(muestra);
-  const obtenido = JSON.stringify(salida);
-  if (esperado !== obtenido) {
-    return { ok: false, etapa: 'comparar', detalle: `esperado≠obtenido\nesp=${esperado}\nobt=${obtenido}` };
-  }
-
-  return { ok: true, detalle: `Cifrado y descifrado correctos (formato ${envelope.formato}, ${envelope.iteraciones} iter).` };
 }
