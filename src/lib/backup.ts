@@ -77,6 +77,31 @@ function utf8ToBytes(str: string): Uint8Array {
   return new Uint8Array(bytes);
 }
 
+const B64_ALFABETO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+// Decodifica base64 a bytes. Necesario porque fromCombined/fromParts de
+// expo-crypto en Android sólo aceptan Uint8Array (aunque el tipo diga string).
+function base64ToBytes(b64: string): Uint8Array {
+  const lookup = new Int16Array(256).fill(-1);
+  for (let i = 0; i < B64_ALFABETO.length; i++) lookup[B64_ALFABETO.charCodeAt(i)] = i;
+  const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
+  const out = new Uint8Array(Math.floor((clean.length * 6) / 8));
+  let bits = 0;
+  let acc = 0;
+  let oi = 0;
+  for (let i = 0; i < clean.length; i++) {
+    const v = lookup[clean.charCodeAt(i)];
+    if (v < 0) continue;
+    acc = (acc << 6) | v;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out[oi++] = (acc >> bits) & 0xff;
+    }
+  }
+  return out;
+}
+
 function bytesToUtf8(bytes: Uint8Array): string {
   let out = '';
   let i = 0;
@@ -151,17 +176,17 @@ async function descifrarEnvelope(envelope: Envelope, password: string): Promise<
   const key = await deriveKey(password, envelope.salt, envelope.iteraciones);
   let sealed: Crypto.AESSealedData;
   if (envelope.combined || envelope.contenido) {
-    // Formatos 3 y 1: string combinado.
-    sealed = Crypto.AESSealedData.fromCombined((envelope.combined ?? envelope.contenido) as string, {
+    // Formatos 3 y 1: string combinado base64 → bytes (native espera Uint8Array).
+    sealed = Crypto.AESSealedData.fromCombined(base64ToBytes((envelope.combined ?? envelope.contenido) as string), {
       ivLength: envelope.ivLength ?? IV_LENGTH,
       tagLength: (envelope.tagLength ?? TAG_LENGTH) as Crypto.GCMTagByteLength,
     });
   } else {
     // Formato 2: partes por separado (compat con backups viejos que funcionaran).
     sealed = Crypto.AESSealedData.fromParts(
-      envelope.iv as string,
-      envelope.ciphertext as string,
-      envelope.tag as string,
+      base64ToBytes(envelope.iv as string),
+      base64ToBytes(envelope.ciphertext as string),
+      base64ToBytes(envelope.tag as string),
     );
   }
   const bytes = (await Crypto.aesDecryptAsync(sealed, key)) as Uint8Array;
