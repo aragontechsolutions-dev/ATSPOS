@@ -21,6 +21,7 @@ const ingresar: SeccionManual = {
     'Abrí ATSPOS y escribí tu usuario y contraseña.',
     'Si es tu primer ingreso, la app te va a pedir que cambies la contraseña por una tuya.',
     'Por seguridad, la sesión se cierra sola después de 5 minutos sin uso. Si pasó, volvé a ingresar.',
+    'Antes de cerrarse te avisa con una cuenta regresiva de 30 segundos: tocá "Seguir conectado" (o cualquier parte de la pantalla) para no perder la sesión.',
   ],
 };
 
@@ -160,9 +161,11 @@ const seguridad: SeccionManual = {
   titulo: 'Backups y seguridad',
   icono: 'shield-lock',
   pasos: [
-    'Andá a Ajustes → "Backups y auditoría".',
-    'Exportá un backup cifrado con una contraseña que elijas y guardalo en un lugar seguro (¡no la olvides!).',
-    'Para restaurar en otro teléfono, usá "Restaurar backup" con ese archivo y su contraseña.',
+    'Andá a Ajustes → "Backups y auditoría" → "Exportar backup cifrado".',
+    'Elegí una contraseña para el backup y guardala en un lugar seguro: sin ella NO se puede restaurar.',
+    'Tenés dos opciones para el archivo: "Guardar en el teléfono" (te deja elegir una carpeta, ideal "Descargas", y así lo encontrás fácil para restaurar) o "Compartir" (para mandarlo por WhatsApp, Drive o mail).',
+    'El backup incluye todos tus datos: productos, ventas, caja, clientes y fiados. Hacé uno seguido (por ejemplo al cerrar el día).',
+    'Para restaurar: "Restaurar backup" → "Elegir archivo", buscá el .atsbak (en Descargas, Drive o el recibido por WhatsApp) y escribí su contraseña. Ojo: restaurar REEMPLAZA todos los datos actuales por los del backup.',
     'En "Ver log de auditoría" queda registrado quién hizo cada acción importante.',
   ],
 };
