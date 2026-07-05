@@ -7,6 +7,7 @@ const SESSION_KEY = 'atspos_session_user_id';
 const ACTIVITY_KEY = 'atspos_last_activity';
 
 export const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
+export const AVISO_CIERRE_MS = 30 * 1000; // avisar 30 s antes del cierre
 
 // Kept outside React state so recording activity on every touch does not cause
 // re-renders. Persisted to SecureStore (throttled) so the timeout also applies
@@ -36,6 +37,8 @@ interface SessionState {
   flushActivity: () => void;
   /** Logs out if the inactivity window has elapsed. */
   checkExpiry: () => void;
+  /** Milisegundos hasta el cierre por inactividad (Infinity si no hay sesión). */
+  msHastaCierre: () => number;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -112,5 +115,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (Date.now() - ref > INACTIVITY_TIMEOUT_MS) {
       get().logout();
     }
+  },
+
+  msHastaCierre: () => {
+    if (!get().usuario) return Infinity;
+    // En foreground el valor en memoria es el autoritativo (touch lo actualiza).
+    return INACTIVITY_TIMEOUT_MS - (Date.now() - lastActivity);
   },
 }));
