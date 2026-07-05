@@ -22,8 +22,10 @@ const TABLAS_ORDEN = [
   'auditoria',
 ];
 
-const FORMATO = 2;
+const FORMATO = 3;
 const KDF_ITERACIONES = 4096;
+const IV_LENGTH = 12;
+const TAG_LENGTH = 16;
 
 type Fila = Record<string, string | number | null>;
 type Dump = Record<string, Fila[]>;
@@ -34,13 +36,17 @@ interface Envelope {
   fecha: string;
   salt: string;
   iteraciones: number;
-  // Partes AES-GCM guardadas por separado (formato 2). Inequívoco al restaurar.
-  iv?: string; // base64
-  ciphertext?: string; // base64, sin el tag
-  tag?: string; // base64
-  // Formato 1 (compatibilidad hacia atrás): iv+ciphertext+tag combinados.
-  ivLength?: number;
-  tagLength?: number;
+  // Formato 3: IV+ciphertext+tag en un solo string base64 (combined). Es el
+  // único método de expo-crypto que devuelve string de forma fiable en Android.
+  combined?: string; // base64
+  ivLength?: number; // bytes del IV dentro de combined
+  tagLength?: number; // bytes del tag dentro de combined
+  // Formato 2 (compat): partes por separado. NOTA: ciphertext() a veces
+  // devolvía bytes en vez de base64, por eso se dejó de usar.
+  iv?: string;
+  ciphertext?: string;
+  tag?: string;
+  // Formato 1 (compat): campo `contenido` combinado.
   contenido?: string;
 }
 
@@ -125,28 +131,39 @@ async function cifrarObjeto(obj: unknown, password: string): Promise<Envelope> {
   const plaintext = utf8ToBytes(JSON.stringify(obj));
   const sealed = await Crypto.aesEncryptAsync(plaintext, key);
 
+  // combined('base64') usa la misma forma posicional que iv()/tag(), que sí
+  // devuelven base64 de forma fiable en Android (ciphertext(options) devolvía
+  // bytes pese a pedir base64, rompiendo el round-trip por JSON).
   return {
     app: 'ATSPOS',
     formato: FORMATO,
     fecha: new Date().toISOString(),
     salt,
     iteraciones: KDF_ITERACIONES,
-    iv: (await sealed.iv('base64')) as string,
-    ciphertext: (await sealed.ciphertext({ includeTag: false, encoding: 'base64' })) as string,
-    tag: (await sealed.tag('base64')) as string,
+    combined: (await sealed.combined('base64')) as string,
+    ivLength: IV_LENGTH,
+    tagLength: TAG_LENGTH,
   };
 }
 
-/** Descifra un Envelope (formato 1 o 2) devolviendo el objeto original. */
+/** Descifra un Envelope (formato 1, 2 o 3) devolviendo el objeto original. */
 async function descifrarEnvelope(envelope: Envelope, password: string): Promise<unknown> {
   const key = await deriveKey(password, envelope.salt, envelope.iteraciones);
-  const sealed =
-    envelope.iv && envelope.ciphertext && envelope.tag
-      ? Crypto.AESSealedData.fromParts(envelope.iv, envelope.ciphertext, envelope.tag)
-      : Crypto.AESSealedData.fromCombined(envelope.contenido as string, {
-          ivLength: envelope.ivLength ?? 12,
-          tagLength: (envelope.tagLength ?? 16) as Crypto.GCMTagByteLength,
-        });
+  let sealed: Crypto.AESSealedData;
+  if (envelope.combined || envelope.contenido) {
+    // Formatos 3 y 1: string combinado.
+    sealed = Crypto.AESSealedData.fromCombined((envelope.combined ?? envelope.contenido) as string, {
+      ivLength: envelope.ivLength ?? IV_LENGTH,
+      tagLength: (envelope.tagLength ?? TAG_LENGTH) as Crypto.GCMTagByteLength,
+    });
+  } else {
+    // Formato 2: partes por separado (compat con backups viejos que funcionaran).
+    sealed = Crypto.AESSealedData.fromParts(
+      envelope.iv as string,
+      envelope.ciphertext as string,
+      envelope.tag as string,
+    );
+  }
   const bytes = (await Crypto.aesDecryptAsync(sealed, key)) as Uint8Array;
   return JSON.parse(bytesToUtf8(bytes));
 }
@@ -263,13 +280,14 @@ export async function restaurarBackup(password: string): Promise<ResultadoRestor
   try {
     envelope = JSON.parse(texto);
     const tienePartes = envelope.iv && envelope.ciphertext && envelope.tag;
-    if (envelope.app !== 'ATSPOS' || !envelope.salt || !(tienePartes || envelope.contenido)) {
+    const tieneCarga = envelope.combined || envelope.contenido || tienePartes;
+    if (envelope.app !== 'ATSPOS' || !envelope.salt || !tieneCarga) {
       return {
         ok: false,
         motivo: 'formato',
-        detalle: `app=${String(envelope.app)} salt=${envelope.salt ? 'sí' : 'no'} partes=${
-          tienePartes ? 'sí' : 'no'
-        } contenido=${envelope.contenido ? 'sí' : 'no'} len=${texto.length}`,
+        detalle: `app=${String(envelope.app)} salt=${envelope.salt ? 'sí' : 'no'} combined=${
+          envelope.combined ? 'sí' : 'no'
+        } partes=${tienePartes ? 'sí' : 'no'} contenido=${envelope.contenido ? 'sí' : 'no'} len=${texto.length}`,
       };
     }
   } catch (e) {
@@ -339,7 +357,9 @@ export async function autotestBackup(): Promise<ResultadoAutotest> {
     return {
       ok: false,
       etapa: 'descifrar',
-      detalle: `${mensajeError(e)} · iv=${reparsed.iv?.length} ct=${reparsed.ciphertext?.length} tag=${reparsed.tag?.length}`,
+      detalle: `${mensajeError(e)} · combined(${typeof reparsed.combined})=${
+        typeof reparsed.combined === 'string' ? reparsed.combined.length : JSON.stringify(reparsed.combined)?.slice(0, 40)
+      }`,
     };
   }
 
