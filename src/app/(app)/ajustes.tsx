@@ -74,6 +74,13 @@ export default function AjustesScreen() {
       <List.Section>
         <List.Subheader>Mi cuenta</List.Subheader>
         <List.Item title={usuario?.nombre} description={`@${usuario?.username} · ${usuario?.rol}`} />
+        <List.Item
+          title="Manual de uso"
+          description="Guía paso a paso según tu rol"
+          left={(props) => <List.Icon {...props} icon="book-open-variant" />}
+          right={(props) => <List.Icon {...props} icon="chevron-right" />}
+          onPress={() => router.push('/manual')}
+        />
         <Button icon="logout" onPress={() => logout()} style={styles.logoutButton}>
           Cerrar sesión
         </Button>

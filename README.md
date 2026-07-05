@@ -59,6 +59,8 @@ expo-sqlite + Drizzle ORM, y React Native Paper.
   categorías y stock inicial de los productos nuevos).
 - **Hoja de etiquetas QR**: PDF imprimible con el QR, nombre y precio de todos los
   productos en grilla (ideal tras una importación masiva).
+- **Manual de uso embebido por rol**: guía paso a paso según el rol; cada usuario ve la de
+  su rol y el admin puede ver la de todos (accesible desde Ajustes).
 
 Pendiente para etapas siguientes: sincronización multi-dispositivo.
 

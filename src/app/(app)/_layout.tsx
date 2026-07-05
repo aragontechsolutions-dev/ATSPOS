@@ -92,6 +92,7 @@ export default function AppTabsLayout() {
       <Tabs.Screen name="cliente-detalle" options={{ href: null, title: 'Cliente' }} />
       <Tabs.Screen name="categorias" options={{ href: null, title: 'Categorías' }} />
       <Tabs.Screen name="importar-productos" options={{ href: null, title: 'Importar productos' }} />
+      <Tabs.Screen name="manual" options={{ href: null, title: 'Manual de uso' }} />
     </Tabs>
   );
 }
