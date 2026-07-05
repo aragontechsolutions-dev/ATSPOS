@@ -22,7 +22,7 @@ const TABLAS_ORDEN = [
   'auditoria',
 ];
 
-const FORMATO = 1;
+const FORMATO = 2;
 const KDF_ITERACIONES = 4096;
 
 type Fila = Record<string, string | number | null>;
@@ -34,9 +34,14 @@ interface Envelope {
   fecha: string;
   salt: string;
   iteraciones: number;
-  ivLength: number;
-  tagLength: number;
-  contenido: string; // base64 de iv+ciphertext+tag
+  // Partes AES-GCM guardadas por separado (formato 2). Inequívoco al restaurar.
+  iv?: string; // base64
+  ciphertext?: string; // base64, sin el tag
+  tag?: string; // base64
+  // Formato 1 (compatibilidad hacia atrás): iv+ciphertext+tag combinados.
+  ivLength?: number;
+  tagLength?: number;
+  contenido?: string;
 }
 
 function randomHex(bytes: number): string {
@@ -116,7 +121,6 @@ async function construirBackupJson(password: string): Promise<string> {
 
   const plaintext = utf8ToBytes(JSON.stringify(dump));
   const sealed = await Crypto.aesEncryptAsync(plaintext, key);
-  const contenido = (await sealed.combined('base64')) as string;
 
   const envelope: Envelope = {
     app: 'ATSPOS',
@@ -124,9 +128,9 @@ async function construirBackupJson(password: string): Promise<string> {
     fecha: new Date().toISOString(),
     salt,
     iteraciones: KDF_ITERACIONES,
-    ivLength: sealed.ivSize,
-    tagLength: sealed.tagSize,
-    contenido,
+    iv: (await sealed.iv('base64')) as string,
+    ciphertext: (await sealed.ciphertext({ includeTag: false, encoding: 'base64' })) as string,
+    tag: (await sealed.tag('base64')) as string,
   };
   return JSON.stringify(envelope);
 }
@@ -225,7 +229,8 @@ export async function restaurarBackup(password: string): Promise<ResultadoRestor
   let envelope: Envelope;
   try {
     envelope = JSON.parse(texto);
-    if (envelope.app !== 'ATSPOS' || !envelope.contenido || !envelope.salt) {
+    const tienePartes = envelope.iv && envelope.ciphertext && envelope.tag;
+    if (envelope.app !== 'ATSPOS' || !envelope.salt || !(tienePartes || envelope.contenido)) {
       return { ok: false, motivo: 'formato' };
     }
   } catch {
@@ -235,10 +240,13 @@ export async function restaurarBackup(password: string): Promise<ResultadoRestor
   let dump: Dump;
   try {
     const key = await deriveKey(password, envelope.salt, envelope.iteraciones);
-    const sealed = Crypto.AESSealedData.fromCombined(envelope.contenido, {
-      ivLength: envelope.ivLength ?? 12,
-      tagLength: (envelope.tagLength ?? 16) as Crypto.GCMTagByteLength,
-    });
+    const sealed =
+      envelope.iv && envelope.ciphertext && envelope.tag
+        ? Crypto.AESSealedData.fromParts(envelope.iv, envelope.ciphertext, envelope.tag)
+        : Crypto.AESSealedData.fromCombined(envelope.contenido as string, {
+            ivLength: envelope.ivLength ?? 12,
+            tagLength: (envelope.tagLength ?? 16) as Crypto.GCMTagByteLength,
+          });
     const bytes = (await Crypto.aesDecryptAsync(sealed, key)) as Uint8Array;
     dump = JSON.parse(bytesToUtf8(bytes));
   } catch {
