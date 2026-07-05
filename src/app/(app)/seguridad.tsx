@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Dialog, HelperText, List, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
 
-import { exportarBackup, restaurarBackup } from '@/lib/backup';
+import { exportarBackup, guardarBackupEnCarpeta, restaurarBackup } from '@/lib/backup';
 import { auditar } from '@/lib/audit';
 import { useSessionStore } from '@/store/session';
 
@@ -44,6 +44,33 @@ export default function SeguridadScreen() {
       setSnackbar(compartido ? 'Backup generado' : 'Backup guardado (compartir no disponible)');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo generar el backup');
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  async function onGuardarEnTelefono() {
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    if (password !== password2) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+    setError(null);
+    setProcesando(true);
+    try {
+      const res = await guardarBackupEnCarpeta(password);
+      if (res.ok) {
+        auditar('Backup guardado en el teléfono');
+        setDialogo(null);
+        setSnackbar('Backup guardado en la carpeta elegida');
+      } else if (res.motivo === 'cancelado') {
+        // el usuario cerró el selector de carpeta
+      } else {
+        setError('No se pudo guardar en esa carpeta. Probá con "Descargas".');
+      }
     } finally {
       setProcesando(false);
     }
@@ -95,7 +122,7 @@ export default function SeguridadScreen() {
       <Card style={styles.card}>
         <List.Item
           title="Exportar backup cifrado"
-          description="Genera un archivo .atsbak y lo comparte"
+          description="Genera un .atsbak: compartilo o guardalo en una carpeta del teléfono"
           left={(props) => <List.Icon {...props} icon="cloud-upload" />}
           onPress={() => abrir('exportar')}
         />
@@ -104,7 +131,7 @@ export default function SeguridadScreen() {
       <Card style={styles.card}>
         <List.Item
           title="Restaurar backup"
-          description="Reemplaza todos los datos actuales"
+          description="Elegí un archivo .atsbak y reemplazá los datos actuales"
           left={(props) => <List.Icon {...props} icon="cloud-download" />}
           onPress={() => abrir('restaurar')}
         />
@@ -139,14 +166,18 @@ export default function SeguridadScreen() {
               mode="outlined"
               style={styles.input}
             />
+            <Text variant="bodySmall" style={styles.tip}>
+              Consejo: para poder restaurarlo después en este teléfono, usá "Guardar en el teléfono" y elegí
+              la carpeta "Descargas".
+            </Text>
             {error && <HelperText type="error">{error}</HelperText>}
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setDialogo(null)} disabled={procesando}>
-              Cancelar
+          <Dialog.Actions style={styles.exportActions}>
+            <Button icon="content-save" onPress={onGuardarEnTelefono} loading={procesando} disabled={procesando}>
+              Guardar en el teléfono
             </Button>
-            <Button mode="contained" onPress={onExportar} loading={procesando} disabled={procesando}>
-              Exportar
+            <Button icon="share-variant" mode="contained" onPress={onExportar} loading={procesando} disabled={procesando}>
+              Compartir
             </Button>
           </Dialog.Actions>
         </Dialog>
@@ -155,7 +186,8 @@ export default function SeguridadScreen() {
           <Dialog.Title>Restaurar backup</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium" style={styles.warn}>
-              Esto reemplaza todos los datos actuales por los del backup. Elegí el archivo .atsbak y su contraseña.
+              Esto reemplaza todos los datos actuales por los del backup. Al tocar "Elegir archivo" buscá el
+              .atsbak donde lo guardaste (Descargas, Drive, o el documento recibido por WhatsApp).
             </Text>
             <TextInput
               label="Contraseña del backup"
@@ -191,4 +223,6 @@ const styles = StyleSheet.create({
   card: { marginTop: 2 },
   input: { marginBottom: 8 },
   warn: { marginBottom: 12 },
+  tip: { opacity: 0.7, marginBottom: 8 },
+  exportActions: { flexWrap: 'wrap' },
 });

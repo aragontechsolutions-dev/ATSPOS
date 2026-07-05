@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 import { sqliteDb } from '@/db/client';
@@ -107,8 +107,9 @@ function dumpTablas(): Dump {
   return dump;
 }
 
-/** Exports an encrypted backup of the whole database and opens the share sheet. */
-export async function exportarBackup(password: string): Promise<boolean> {
+const nombreBackup = () => `atspos-backup-${new Date().toISOString().slice(0, 10)}.atsbak`;
+
+async function construirBackupJson(password: string): Promise<string> {
   const dump = dumpTablas();
   const salt = randomHex(16);
   const key = await deriveKey(password, salt, KDF_ITERACIONES);
@@ -127,12 +128,16 @@ export async function exportarBackup(password: string): Promise<boolean> {
     tagLength: sealed.tagSize,
     contenido,
   };
+  return JSON.stringify(envelope);
+}
 
-  const nombre = `atspos-backup-${new Date().toISOString().slice(0, 10)}.atsbak`;
-  const file = new File(Paths.document, nombre);
+/** Exports an encrypted backup and opens the share sheet (WhatsApp/Drive/mail). */
+export async function exportarBackup(password: string): Promise<boolean> {
+  const json = await construirBackupJson(password);
+  const file = new File(Paths.document, nombreBackup());
   if (file.exists) file.delete();
   file.create();
-  file.write(JSON.stringify(envelope));
+  file.write(json);
 
   if (file.size <= 0) throw new Error('El backup quedó vacío al generarse');
 
@@ -144,6 +149,34 @@ export async function exportarBackup(password: string): Promise<boolean> {
     dialogTitle: 'Guardar backup de ATSPOS',
   });
   return true;
+}
+
+export interface ResultadoGuardado {
+  ok: boolean;
+  motivo?: 'cancelado' | 'error';
+}
+
+/**
+ * Saves the backup into a folder the user picks (e.g. Downloads). Unlike the
+ * app's private dir, this location is browsable later from the restore picker.
+ */
+export async function guardarBackupEnCarpeta(password: string): Promise<ResultadoGuardado> {
+  const json = await construirBackupJson(password);
+
+  let carpeta: Directory;
+  try {
+    carpeta = await Directory.pickDirectoryAsync();
+  } catch {
+    return { ok: false, motivo: 'cancelado' };
+  }
+
+  try {
+    const file = carpeta.createFile(nombreBackup(), 'application/octet-stream');
+    file.write(json);
+    return { ok: true };
+  } catch {
+    return { ok: false, motivo: 'error' };
+  }
 }
 
 function reemplazarDatos(dump: Dump): void {
