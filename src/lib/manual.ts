@@ -137,6 +137,7 @@ const conteoInventario: SeccionManual = {
     'A medida que escribís, la app te muestra la diferencia contra el stock del sistema (verde = sobra, rojo = falta).',
     'Tocá "Aplicar conteo", revisá el resumen de diferencias y el impacto en el valor del inventario, y confirmá.',
     'El sistema corrige el stock a lo que contaste y deja el ajuste registrado en el historial y la auditoría.',
+    'Al terminar, podés tocar "Exportar a Excel" para guardar o compartir la planilla del conteo (diferencias e impacto en valor) como constancia del cierre.',
   ],
 };
 

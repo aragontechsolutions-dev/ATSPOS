@@ -117,6 +117,48 @@ export async function exportarReporteVentas(datos: DatosReporteVentas): Promise<
   return compartirWorkbook(wb, `ventas-${fecha}.xlsx`);
 }
 
+export interface FilaConteo {
+  nombre: string;
+  unidadMedida: string;
+  stockSistema: number;
+  cantidadContada: number;
+  delta: number;
+  valorDelta: number; // en centavos
+}
+
+/** Exports the result of a physical inventory count (recuento de cierre). */
+export async function exportarConteo(filas: FilaConteo[]): Promise<boolean> {
+  const wb = XLSX.utils.book_new();
+
+  const totalFaltante = filas.filter((f) => f.delta < 0).reduce((a, f) => a + f.valorDelta, 0);
+  const totalSobrante = filas.filter((f) => f.delta > 0).reduce((a, f) => a + f.valorDelta, 0);
+
+  const resumenRows = [
+    ['Conteo de inventario', fechaLegible(new Date())],
+    [],
+    ['Productos ajustados', filas.length],
+    ['Valor faltante', toDecimal(totalFaltante)],
+    ['Valor sobrante', toDecimal(totalSobrante)],
+    ['Impacto neto', toDecimal(totalFaltante + totalSobrante)],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumenRows), 'Resumen');
+
+  const detalle = XLSX.utils.json_to_sheet(
+    filas.map((f) => ({
+      Producto: f.nombre,
+      Unidad: f.unidadMedida,
+      'Stock sistema': f.stockSistema,
+      Contado: f.cantidadContada,
+      Diferencia: f.delta,
+      'Impacto en valor': toDecimal(f.valorDelta),
+    })),
+  );
+  XLSX.utils.book_append_sheet(wb, detalle, 'Diferencias');
+
+  const fecha = new Date().toISOString().slice(0, 10);
+  return compartirWorkbook(wb, `conteo-inventario-${fecha}.xlsx`);
+}
+
 export interface FilaInventario {
   nombre: string;
   stockActual: number;

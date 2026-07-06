@@ -17,6 +17,7 @@ import {
 import { listarProductos, type Producto } from '@/db/repositories/productos';
 import { aplicarConteoInventario, type ResultadoConteoLinea } from '@/db/repositories/stock';
 import { auditar } from '@/lib/audit';
+import { exportarConteo } from '@/lib/export-excel';
 import { formatCantidad, formatMoney } from '@/lib/money';
 import { useSessionStore } from '@/store/session';
 
@@ -29,6 +30,7 @@ export default function ConteoInventarioScreen() {
   const [confirmar, setConfirmar] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoConteoLinea[] | null>(null);
+  const [exportando, setExportando] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
 
   const recargar = useCallback(() => {
@@ -91,6 +93,28 @@ export default function ConteoInventarioScreen() {
       setSnackbar(e instanceof Error ? e.message : 'No se pudo aplicar el conteo');
     } finally {
       setProcesando(false);
+    }
+  }
+
+  async function onExportar() {
+    if (!resultado || resultado.length === 0) return;
+    setExportando(true);
+    try {
+      const compartido = await exportarConteo(
+        resultado.map((l) => ({
+          nombre: l.nombre,
+          unidadMedida: l.unidadMedida,
+          stockSistema: l.stockSistema,
+          cantidadContada: l.cantidadContada,
+          delta: l.delta,
+          valorDelta: l.valorDelta,
+        })),
+      );
+      if (!compartido) setSnackbar('Compartir no está disponible en este dispositivo');
+    } catch (e) {
+      setSnackbar(e instanceof Error ? e.message : 'No se pudo exportar el conteo');
+    } finally {
+      setExportando(false);
     }
   }
 
@@ -245,7 +269,14 @@ export default function ConteoInventarioScreen() {
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setResultado(null)}>Cerrar</Button>
+            {resultado && resultado.length > 0 && (
+              <Button icon="microsoft-excel" onPress={onExportar} loading={exportando} disabled={exportando}>
+                Exportar a Excel
+              </Button>
+            )}
+            <Button onPress={() => setResultado(null)} disabled={exportando}>
+              Cerrar
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
