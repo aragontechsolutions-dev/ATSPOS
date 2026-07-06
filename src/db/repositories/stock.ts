@@ -82,6 +82,65 @@ export async function corregirStockPorConteo(input: {
   });
 }
 
+export interface ConteoItem {
+  productoId: string;
+  cantidadContada: number;
+}
+
+export interface ResultadoConteoLinea {
+  productoId: string;
+  nombre: string;
+  unidadMedida: string;
+  stockSistema: number;
+  cantidadContada: number;
+  delta: number; // contado - sistema (positivo = sobrante, negativo = faltante)
+  valorDelta: number; // delta * precioCosto, en centavos
+}
+
+/**
+ * Applies a whole physical inventory count (recuento de cierre) in one
+ * transaction. For each counted product it records an `ajuste` movement with
+ * the delta against the system stock, tagged with a shared `referenciaId` so
+ * the whole count session can be traced. Products with no difference are
+ * skipped. Returns one line per counted product (with its delta) for the report.
+ */
+export async function aplicarConteoInventario(input: {
+  items: ConteoItem[];
+  usuarioId: string;
+}): Promise<{ referenciaId: string; lineas: ResultadoConteoLinea[] }> {
+  const referenciaId = newId();
+  const lineas: ResultadoConteoLinea[] = [];
+
+  db.transaction((tx) => {
+    for (const item of input.items) {
+      const producto = tx.select().from(productos).where(eq(productos.id, item.productoId)).get();
+      if (!producto) continue;
+      const delta = item.cantidadContada - producto.stockActual;
+      lineas.push({
+        productoId: producto.id,
+        nombre: producto.nombre,
+        unidadMedida: producto.unidadMedida,
+        stockSistema: producto.stockActual,
+        cantidadContada: item.cantidadContada,
+        delta,
+        valorDelta: Math.round(delta * producto.precioCosto),
+      });
+      if (delta === 0) continue;
+      insertarMovimientoSync(tx, {
+        productoId: producto.id,
+        tipo: 'ajuste',
+        cantidad: delta,
+        motivo: 'conteo de inventario',
+        referenciaId,
+        usuarioId: input.usuarioId,
+      });
+      recomputeStockActualSync(tx, producto.id);
+    }
+  });
+
+  return { referenciaId, lineas };
+}
+
 /**
  * Moves units between the back-room (`stock_deposito`) and the sales floor
  * (`stock_actual`). Floor stock stays ledger-backed via a `traspaso` movement;

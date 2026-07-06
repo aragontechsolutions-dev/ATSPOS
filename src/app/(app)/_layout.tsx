@@ -84,6 +84,7 @@ export default function AppTabsLayout() {
       <Tabs.Screen name="proveedores" options={{ href: null, title: 'Proveedores' }} />
       <Tabs.Screen name="compras" options={{ href: null, title: 'Nueva compra' }} />
       <Tabs.Screen name="ajuste-stock" options={{ href: null, title: 'Ajuste de stock' }} />
+      <Tabs.Screen name="conteo-inventario" options={{ href: null, title: 'Conteo de inventario' }} />
       <Tabs.Screen name="producto-qr" options={{ href: null, title: 'Código QR' }} />
       <Tabs.Screen name="seguridad" options={{ href: null, title: 'Seguridad' }} />
       <Tabs.Screen name="auditoria" options={{ href: null, title: 'Auditoría' }} />

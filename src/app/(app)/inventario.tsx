@@ -59,6 +59,13 @@ export default function InventarioScreen() {
         />
         <Divider />
         <List.Item
+          title="Conteo de inventario"
+          description="Recuento físico de cierre: ajustá el stock a lo que contás"
+          left={(props) => <List.Icon {...props} icon="clipboard-list" />}
+          onPress={() => router.push('/conteo-inventario')}
+        />
+        <Divider />
+        <List.Item
           title="Proveedores"
           description="Gestionar proveedores"
           left={(props) => <List.Icon {...props} icon="account-tie" />}

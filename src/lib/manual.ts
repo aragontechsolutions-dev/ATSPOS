@@ -127,6 +127,19 @@ const inventario: SeccionManual = {
   ],
 };
 
+const conteoInventario: SeccionManual = {
+  titulo: 'Conteo de inventario (cierre del día)',
+  icono: 'clipboard-list',
+  pasos: [
+    'Andá a Inventario → "Conteo de inventario".',
+    'Recorré los productos (podés buscarlos por nombre) y escribí en "Contado" cuántas unidades tenés realmente en la góndola/depósito. Para productos por peso, poné los kilos.',
+    'Los que dejes en blanco NO se tocan: solo se ajustan los que anotes.',
+    'A medida que escribís, la app te muestra la diferencia contra el stock del sistema (verde = sobra, rojo = falta).',
+    'Tocá "Aplicar conteo", revisá el resumen de diferencias y el impacto en el valor del inventario, y confirmá.',
+    'El sistema corrige el stock a lo que contaste y deja el ajuste registrado en el historial y la auditoría.',
+  ],
+};
+
 const reportes: SeccionManual = {
   titulo: 'Reportes y ventas',
   icono: 'chart-box',
@@ -190,6 +203,7 @@ export const MANUALES: Record<RolNombre, ManualRol> = {
       qr,
       importar,
       inventario,
+      conteoInventario,
       reportes,
       anular,
     ],
@@ -208,6 +222,7 @@ export const MANUALES: Record<RolNombre, ManualRol> = {
       qr,
       importar,
       inventario,
+      conteoInventario,
       reportes,
       anular,
       usuarios,
